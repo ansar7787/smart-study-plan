@@ -15,6 +15,26 @@ import 'package:smart_study_plan/features/admin_panel/domain/usecases/get_all_us
 import 'package:smart_study_plan/features/admin_panel/presentation/bloc/admin_bloc.dart';
 import 'package:smart_study_plan/features/admin_panel/presentation/bloc/admin_dashboard/admin_dashboard_bloc.dart';
 import 'package:smart_study_plan/features/admin_panel/presentation/bloc/admin_users/admin_users_bloc.dart';
+import 'package:smart_study_plan/features/subjects/data/datasources/subject_local_datasource.dart';
+import 'package:smart_study_plan/features/subjects/data/datasources/subject_remote_datasource.dart';
+import 'package:smart_study_plan/features/subjects/data/models/subject_model.dart';
+import 'package:smart_study_plan/features/subjects/data/repositories/subject_repository_impl.dart';
+import 'package:smart_study_plan/features/subjects/domain/repositories/subject_repository.dart';
+import 'package:smart_study_plan/features/subjects/domain/usecases/create_subject.dart';
+import 'package:smart_study_plan/features/subjects/domain/usecases/delete_subject.dart';
+import 'package:smart_study_plan/features/subjects/domain/usecases/get_subjects.dart';
+import 'package:smart_study_plan/features/subjects/domain/usecases/update_subject.dart';
+import 'package:smart_study_plan/features/subjects/presentation/bloc/subject_bloc.dart';
+import 'package:smart_study_plan/features/tasks/data/datasources/task_local_datasource.dart';
+import 'package:smart_study_plan/features/tasks/data/datasources/task_remote_datasource.dart';
+import 'package:smart_study_plan/features/tasks/data/models/task_model.dart';
+import 'package:smart_study_plan/features/tasks/data/repositories/task_repository_impl.dart';
+import 'package:smart_study_plan/features/tasks/domain/repositories/task_repository.dart';
+import 'package:smart_study_plan/features/tasks/domain/usecases/create_task.dart';
+import 'package:smart_study_plan/features/tasks/domain/usecases/delete_task.dart';
+import 'package:smart_study_plan/features/tasks/domain/usecases/get_tasks_by_subject.dart';
+import 'package:smart_study_plan/features/tasks/domain/usecases/update_task.dart';
+import 'package:smart_study_plan/features/tasks/presentation/bloc/task_bloc.dart';
 import 'package:smart_study_plan/features/user_management/data/datasources/user_local_datasource.dart';
 import 'package:smart_study_plan/features/user_management/data/datasources/user_remote_datasource.dart';
 import 'package:smart_study_plan/features/user_management/data/repositories/user_repository_impl.dart';
@@ -146,6 +166,103 @@ Future<void> setupServiceLocator() async {
     () => AdminUsersBloc(
       getAllUsersUseCase: getIt<GetAllUsersUseCase>(),
       deleteUserAdminUseCase: getIt<DeleteUserAdminUseCase>(),
+    ),
+  );
+
+  // Hive boxes
+  final subjectsBox = await Hive.openBox<SubjectModel>('subjects');
+  final tasksBox = await Hive.openBox<TaskModel>('tasks');
+
+  getIt.registerSingleton<Box<SubjectModel>>(subjectsBox);
+  getIt.registerSingleton<Box<TaskModel>>(tasksBox);
+
+  // ============ SUBJECT FEATURE ============
+
+  // Remote Datasources
+  getIt.registerSingleton<SubjectRemoteDatasource>(
+    SubjectRemoteDatasourceImpl(firestore: getIt<FirebaseFirestore>()),
+  );
+
+  // Local Datasources
+  getIt.registerSingleton<SubjectLocalDatasource>(
+    SubjectLocalDatasourceImpl(subjectsBox: getIt<Box<SubjectModel>>()),
+  );
+
+  // Repository
+  getIt.registerSingleton<SubjectRepository>(
+    SubjectRepositoryImpl(
+      remoteDatasource: getIt<SubjectRemoteDatasource>(),
+      localDatasource: getIt<SubjectLocalDatasource>(),
+      networkInfo: getIt<NetworkInfo>(),
+    ),
+  );
+
+  // Usecases
+  getIt.registerSingleton<GetSubjectsByUserUsecase>(
+    GetSubjectsByUserUsecase(repository: getIt<SubjectRepository>()),
+  );
+  getIt.registerSingleton<CreateSubjectUsecase>(
+    CreateSubjectUsecase(repository: getIt<SubjectRepository>()),
+  );
+  getIt.registerSingleton<UpdateSubjectUsecase>(
+    UpdateSubjectUsecase(repository: getIt<SubjectRepository>()),
+  );
+  getIt.registerSingleton<DeleteSubjectUsecase>(
+    DeleteSubjectUsecase(repository: getIt<SubjectRepository>()),
+  );
+
+  // BLoC
+  getIt.registerSingleton<SubjectBloc>(
+    SubjectBloc(
+      getSubjectsByUserUsecase: getIt<GetSubjectsByUserUsecase>(),
+      createSubjectUsecase: getIt<CreateSubjectUsecase>(),
+      updateSubjectUsecase: getIt<UpdateSubjectUsecase>(),
+      deleteSubjectUsecase: getIt<DeleteSubjectUsecase>(),
+    ),
+  );
+
+  // ============ TASK FEATURE ============
+
+  // Remote Datasources
+  getIt.registerSingleton<TaskRemoteDatasource>(
+    TaskRemoteDatasourceImpl(firestore: getIt<FirebaseFirestore>()),
+  );
+
+  // Local Datasources
+  getIt.registerSingleton<TaskLocalDatasource>(
+    TaskLocalDatasourceImpl(tasksBox: getIt<Box<TaskModel>>()),
+  );
+
+  // Repository
+  getIt.registerSingleton<TaskRepository>(
+    TaskRepositoryImpl(
+      remoteDatasource: getIt<TaskRemoteDatasource>(),
+      localDatasource: getIt<TaskLocalDatasource>(),
+      networkInfo: getIt<NetworkInfo>(),
+    ),
+  );
+
+  // Usecases
+  getIt.registerSingleton<GetTasksBySubjectUsecase>(
+    GetTasksBySubjectUsecase(repository: getIt<TaskRepository>()),
+  );
+  getIt.registerSingleton<CreateTaskUsecase>(
+    CreateTaskUsecase(repository: getIt<TaskRepository>()),
+  );
+  getIt.registerSingleton<UpdateTaskUsecase>(
+    UpdateTaskUsecase(repository: getIt<TaskRepository>()),
+  );
+  getIt.registerSingleton<DeleteTaskUsecase>(
+    DeleteTaskUsecase(repository: getIt<TaskRepository>()),
+  );
+
+  // BLoC
+  getIt.registerSingleton<TaskBloc>(
+    TaskBloc(
+      getTasksBySubjectUsecase: getIt<GetTasksBySubjectUsecase>(),
+      createTaskUsecase: getIt<CreateTaskUsecase>(),
+      updateTaskUsecase: getIt<UpdateTaskUsecase>(),
+      deleteTaskUsecase: getIt<DeleteTaskUsecase>(),
     ),
   );
 
