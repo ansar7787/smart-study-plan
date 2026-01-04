@@ -1,0 +1,129 @@
+# Create .gitignore
+cat > .gitignore << 'EOF'
+############################
+# Global / OS
+############################
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.log
+*.tmp
+*.bak
+*.orig
+*.class
+*.pyc
+
+############################
+# IDEs / Editors
+############################
+.idea/
+*.iml
+*.ipr
+*.iws
+
+.vscode/
+!.vscode/extensions.json
+
+.atom/
+.history/
+
+############################
+# Git / SVN leftovers
+############################
+.svn/
+.migrate_working_dir/
+
+############################
+# Dart / Flutter (GENERATED)
+############################
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub/
+.pub-cache/
+build/
+coverage/
+
+**/doc/api/
+**/.dart_tool/
+**/.packages
+
+############################
+# Flutter build artifacts
+############################
+**/ios/Flutter/.last_build_id
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/flutter_assets/
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/local.properties
+**/ios/Flutter/plugins.json
+
+############################
+# iOS / macOS (Xcode)
+############################
+**/ios/**/*.xcworkspace
+**/ios/**/*.xcuserstate
+**/ios/**/*.pbxuser
+**/ios/**/*.perspectivev3
+**/ios/**/*.mode1v3
+**/ios/**/*.mode2v3
+**/ios/**/*.moved-aside
+**/ios/**/*.xcarchive
+**/ios/**/*.orig.*
+
+**/ios/**/.symlinks/
+**/ios/**/.vagrant/
+
+############################
+# iOS Secrets / Signing
+############################
+**/ios/**/*.jks
+**/ios/**/*.keystore
+**/ios/**/*.pem
+**/ios/**/*.p12
+**/ios/**/*.mobileprovision
+**/ios/**/*.profile
+**/ios/**/*.properties
+
+############################
+# Android / Gradle (GENERATED)
+############################
+**/android/.gradle/
+**/android/captures/
+**/android/local.properties
+**/android/key.properties
+**/android/**/GeneratedPluginRegistrant.java
+
+**/android/**/build/
+**/android/**/gradle-wrapper.jar
+**/android/gradlew
+**/android/gradlew.bat
+
+############################
+# Firebase / Secrets
+############################
+google-services.json
+GoogleService-Info.plist
+firebase-debug.log
+
+############################
+# Obfuscation / Symbol files
+############################
+app.*.symbols
+app.*.map.json
+
+############################
+# Logs
+############################
+*.log
+
+############################
+# Exceptions (KEEP THESE)
+############################
+!/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
+EOF
