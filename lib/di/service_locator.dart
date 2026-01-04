@@ -1,8 +1,10 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get_it/get_it.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:smart_study_plan/core/network/network_info.dart';
 import 'package:smart_study_plan/features/admin_panel/data/datasources/admin_local_datasource.dart';
 import 'package:smart_study_plan/features/admin_panel/data/datasources/admin_remote_datasource.dart';
 import 'package:smart_study_plan/features/admin_panel/data/repositories/admin_repository_impl.dart';
@@ -40,6 +42,13 @@ Future<void> setupServiceLocator() async {
   // Firebase instances
   final firebaseAuth = FirebaseAuth.instance;
   final firestore = FirebaseFirestore.instance;
+
+  // Network
+  getIt.registerSingleton<Connectivity>(Connectivity());
+
+  getIt.registerSingleton<NetworkInfo>(
+    NetworkInfoImpl(connectivity: getIt<Connectivity>()),
+  );
 
   // Local Datasource
   final localDatasource = UserLocalDatasourceImpl();
