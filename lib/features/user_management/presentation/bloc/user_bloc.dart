@@ -3,7 +3,7 @@ import 'package:equatable/equatable.dart';
 import 'package:smart_study_plan/core/usecase/usecase.dart';
 import 'package:smart_study_plan/core/utils/logger.dart';
 import 'package:smart_study_plan/features/user_management/domain/entities/user.dart';
-import 'package:smart_study_plan/features/user_management/domain/usecases/get_user.dart';
+import 'package:smart_study_plan/features/user_management/domain/usecases/get_current_user.dart';
 import 'package:smart_study_plan/features/user_management/domain/usecases/login_user.dart';
 import 'package:smart_study_plan/features/user_management/domain/usecases/logout_user.dart';
 import 'package:smart_study_plan/features/user_management/domain/usecases/register_user.dart';
@@ -14,7 +14,7 @@ part 'user_state.dart';
 class UserBloc extends Bloc<UserEvent, UserState> {
   final RegisterUserUseCase registerUserUseCase;
   final LoginUserUseCase loginUserUseCase;
-  final GetUserUseCase getCurrentUserUseCase;
+  final GetCurrentUserUseCase getCurrentUserUseCase;
   final LogoutUserUseCase logoutUserUseCase;
 
   UserBloc({
@@ -97,22 +97,28 @@ class UserBloc extends Bloc<UserEvent, UserState> {
     );
   }
 
+  // In UserBloc
   Future<void> _onCheckAuthStatus(
     CheckAuthStatusEvent event,
     Emitter<UserState> emit,
   ) async {
     emit(const UserLoading(message: 'Checking authentication...'));
 
-    final result = await getCurrentUserUseCase('');
+    final result = await getCurrentUserUseCase(const NoParams());
 
     result.fold(
       (failure) {
-        AppLogger.d('User not authenticated');
+        AppLogger.d('User not authenticated: ${failure.message}');
         emit(const UserNotAuthenticated());
       },
       (user) {
-        AppLogger.d('User is authenticated: ${user.email}');
-        emit(UserAuthenticated(user));
+        if (user == null) {
+          AppLogger.d('No current user found');
+          emit(const UserNotAuthenticated());
+        } else {
+          AppLogger.d('User is authenticated: ${user.email}');
+          emit(UserAuthenticated(user));
+        }
       },
     );
   }
@@ -123,15 +129,18 @@ class UserBloc extends Bloc<UserEvent, UserState> {
   ) async {
     emit(const UserLoading(message: 'Loading user...'));
 
-    final result = await getCurrentUserUseCase('');
+    final result = await getCurrentUserUseCase(const NoParams());
 
     result.fold(
       (failure) {
-        AppLogger.e('Failed to get user: ${failure.message}');
         emit(UserError(failure.message));
       },
       (user) {
-        emit(UserAuthenticated(user));
+        if (user == null) {
+          emit(const UserNotAuthenticated());
+        } else {
+          emit(UserAuthenticated(user));
+        }
       },
     );
   }

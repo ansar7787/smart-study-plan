@@ -7,10 +7,12 @@ import 'package:smart_study_plan/features/user_management/data/datasources/user_
 import 'package:smart_study_plan/features/user_management/data/datasources/user_remote_datasource.dart';
 import 'package:smart_study_plan/features/user_management/data/repositories/user_repository_impl.dart';
 import 'package:smart_study_plan/features/user_management/domain/repositories/user_repository.dart';
+import 'package:smart_study_plan/features/user_management/domain/usecases/get_current_user.dart';
 import 'package:smart_study_plan/features/user_management/domain/usecases/get_user.dart';
 import 'package:smart_study_plan/features/user_management/domain/usecases/login_user.dart';
 import 'package:smart_study_plan/features/user_management/domain/usecases/logout_user.dart';
 import 'package:smart_study_plan/features/user_management/domain/usecases/register_user.dart';
+import 'package:smart_study_plan/features/user_management/presentation/bloc/user_bloc.dart';
 
 import '../core/utils/logger.dart';
 
@@ -57,19 +59,24 @@ Future<void> setupServiceLocator() async {
   getIt.registerSingleton<GetUserUseCase>(
     GetUserUseCase(getIt<UserRepository>()),
   );
+
+  getIt.registerSingleton<GetCurrentUserUseCase>(
+    GetCurrentUserUseCase(getIt<UserRepository>()),
+  );
+
   getIt.registerSingleton<LogoutUserUseCase>(
     LogoutUserUseCase(getIt<UserRepository>()),
   );
 
   // Blocs
-  // getIt.registerSingleton<UserBloc>(
-  //   UserBloc(
-  //     registerUserUseCase: getIt<RegisterUserUseCase>(),
-  //     loginUserUseCase: getIt<LoginUserUseCase>(),
-  //     getCurrentUserUseCase: getIt<GetUserUseCase>(),
-  //     logoutUserUseCase: getIt<LogoutUserUseCase>(),
-  //   ),
-  // );
+  getIt.registerSingleton<UserBloc>(
+    UserBloc(
+      registerUserUseCase: getIt<RegisterUserUseCase>(),
+      loginUserUseCase: getIt<LoginUserUseCase>(),
+      getCurrentUserUseCase: getIt<GetCurrentUserUseCase>(),
+      logoutUserUseCase: getIt<LogoutUserUseCase>(),
+    ),
+  );
 
   AppLogger.d('Service locator setup complete');
 }
