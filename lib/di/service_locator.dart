@@ -11,6 +11,8 @@ import 'package:smart_study_plan/features/admin_panel/domain/usecases/delete_use
 import 'package:smart_study_plan/features/admin_panel/domain/usecases/get_admin_stats.dart';
 import 'package:smart_study_plan/features/admin_panel/domain/usecases/get_all_users.dart';
 import 'package:smart_study_plan/features/admin_panel/presentation/bloc/admin_bloc.dart';
+import 'package:smart_study_plan/features/admin_panel/presentation/bloc/admin_dashboard/admin_dashboard_bloc.dart';
+import 'package:smart_study_plan/features/admin_panel/presentation/bloc/admin_users/admin_users_bloc.dart';
 import 'package:smart_study_plan/features/user_management/data/datasources/user_local_datasource.dart';
 import 'package:smart_study_plan/features/user_management/data/datasources/user_remote_datasource.dart';
 import 'package:smart_study_plan/features/user_management/data/repositories/user_repository_impl.dart';
@@ -120,6 +122,20 @@ Future<void> setupServiceLocator() async {
     AdminBloc(
       getAllUsersUseCase: getIt<GetAllUsersUseCase>(),
       getAdminStatsUseCase: getIt<GetAdminStatsUseCase>(),
+      deleteUserAdminUseCase: getIt<DeleteUserAdminUseCase>(),
+    ),
+  );
+
+  // Dashboard bloc
+  getIt.registerFactory<AdminDashboardBloc>(
+    () =>
+        AdminDashboardBloc(getAdminStatsUseCase: getIt<GetAdminStatsUseCase>()),
+  );
+
+  // Users bloc
+  getIt.registerFactory<AdminUsersBloc>(
+    () => AdminUsersBloc(
+      getAllUsersUseCase: getIt<GetAllUsersUseCase>(),
       deleteUserAdminUseCase: getIt<DeleteUserAdminUseCase>(),
     ),
   );

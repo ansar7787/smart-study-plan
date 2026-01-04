@@ -1,27 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import '../bloc/admin_bloc.dart';
+import 'package:smart_study_plan/di/service_locator.dart';
+
+import '../../domain/entities/admin_stats.dart';
+import '../bloc/admin_dashboard/admin_dashboard_bloc.dart';
 import '../widgets/stats_card.dart';
 import '../../../../config/routes/app_routes.dart';
 
-class AdminDashboard extends StatefulWidget {
+class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
 
   @override
-  State<AdminDashboard> createState() => _AdminDashboardState();
+  Widget build(BuildContext context) {
+    return BlocProvider<AdminDashboardBloc>(
+      create: (_) =>
+          getIt<AdminDashboardBloc>()..add(const LoadDashboardEvent()),
+      child: const _AdminDashboardView(),
+    );
+  }
 }
 
-class _AdminDashboardState extends State<AdminDashboard> {
-  @override
-  void initState() {
-    super.initState();
-    _loadDashboardData();
-  }
-
-  void _loadDashboardData() {
-    context.read<AdminBloc>().add(const RefreshAdminDataEvent());
-  }
+class _AdminDashboardView extends StatelessWidget {
+  const _AdminDashboardView();
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +33,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadDashboardData,
+            onPressed: () {
+              context.read<AdminDashboardBloc>().add(
+                const RefreshDashboardEvent(),
+              );
+            },
           ),
           IconButton(
             icon: const Icon(Icons.person),
@@ -40,13 +45,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
         ],
       ),
-      body: BlocBuilder<AdminBloc, AdminState>(
+      body: BlocBuilder<AdminDashboardBloc, AdminDashboardState>(
         builder: (context, state) {
-          if (state is AdminInitial || state is AdminLoading) {
+          if (state is DashboardInitial || state is DashboardLoading) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (state is AdminError) {
+          if (state is DashboardError) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -56,7 +61,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   Text(state.message),
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: _loadDashboardData,
+                    onPressed: () {
+                      context.read<AdminDashboardBloc>().add(
+                        const RefreshDashboardEvent(),
+                      );
+                    },
                     child: const Text('Retry'),
                   ),
                 ],
@@ -64,149 +73,103 @@ class _AdminDashboardState extends State<AdminDashboard> {
             );
           }
 
-          if (state is AdminDataLoaded) {
-            final stats = state.stats;
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    'Overview',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  GridView.count(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: [
-                      StatsCard(
-                        title: 'Total Users',
-                        value: stats.totalUsers,
-                        icon: Icons.people,
-                        backgroundColor: Colors.blue.withValues(alpha: 0.1),
-                        iconColor: Colors.blue[700],
-                      ),
-                      StatsCard(
-                        title: 'Students',
-                        value: stats.totalStudents,
-                        icon: Icons.school,
-                        backgroundColor: Colors.green.withValues(alpha: 0.1),
-                        iconColor: Colors.green[700],
-                      ),
-                      StatsCard(
-                        title: 'Admins',
-                        value: stats.totalAdmins,
-                        icon: Icons.admin_panel_settings,
-                        backgroundColor: Colors.orange.withValues(alpha: 0.1),
-                        iconColor: Colors.orange[700],
-                      ),
-                      StatsCard(
-                        title: 'Tasks',
-                        value: stats.totalTasks,
-                        icon: Icons.task_alt,
-                        backgroundColor: Colors.purple.withValues(alpha: 0.1),
-                        iconColor: Colors.purple[700],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-                  ElevatedButton.icon(
-                    onPressed: () =>
-                        context.pushNamed(AppRouteNames.userManagement),
-                    icon: const Icon(Icons.supervised_user_circle),
-                    label: const Text('Manage Users'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      backgroundColor: Colors.teal,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.blue[200]!),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Quick Info',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildInfoRow(
-                          'Last Updated',
-                          _formatDateTime(stats.lastUpdated),
-                        ),
-                        _buildInfoRow(
-                          'Admin User Ratio',
-                          '${stats.totalAdmins}/${stats.totalUsers}',
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
+          if (state is DashboardLoaded) {
+            return _buildDashboardContent(context, state.stats);
           }
 
-          if (state is AdminStatsLoaded) {
-            final stats = state.stats;
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    'Overview',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  GridView.count(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: [
-                      StatsCard(
-                        title: 'Total Users',
-                        value: stats.totalUsers,
-                        icon: Icons.people,
-                      ),
-                      StatsCard(
-                        title: 'Students',
-                        value: stats.totalStudents,
-                        icon: Icons.school,
-                      ),
-                      StatsCard(
-                        title: 'Admins',
-                        value: stats.totalAdmins,
-                        icon: Icons.admin_panel_settings,
-                      ),
-                      StatsCard(
-                        title: 'Tasks',
-                        value: stats.totalTasks,
-                        icon: Icons.task_alt,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          }
-
+          // Fallback (should not normally reach here)
           return const Center(child: Text('No data available'));
         },
+      ),
+    );
+  }
+
+  Widget _buildDashboardContent(BuildContext context, AdminStats stats) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Overview',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          GridView.count(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              StatsCard(
+                title: 'Total Users',
+                value: stats.totalUsers,
+                icon: Icons.people,
+                backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                iconColor: Colors.blue[700],
+              ),
+              StatsCard(
+                title: 'Students',
+                value: stats.totalStudents,
+                icon: Icons.school,
+                backgroundColor: Colors.green.withValues(alpha: 0.1),
+                iconColor: Colors.green[700],
+              ),
+              StatsCard(
+                title: 'Admins',
+                value: stats.totalAdmins,
+                icon: Icons.admin_panel_settings,
+                backgroundColor: Colors.orange.withValues(alpha: 0.1),
+                iconColor: Colors.orange[700],
+              ),
+              StatsCard(
+                title: 'Tasks',
+                value: stats.totalTasks,
+                icon: Icons.task_alt,
+                backgroundColor: Colors.purple.withValues(alpha: 0.1),
+                iconColor: Colors.purple[700],
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton.icon(
+            onPressed: () => context.pushNamed(AppRouteNames.userManagement),
+            icon: const Icon(Icons.supervised_user_circle),
+            label: const Text('Manage Users'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              backgroundColor: Colors.teal,
+            ),
+          ),
+          const SizedBox(height: 32),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.blue[200]!),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Quick Info',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                _buildInfoRow(
+                  'Last Updated',
+                  _formatDateTime(stats.lastUpdated),
+                ),
+                _buildInfoRow(
+                  'Admin/User Ratio',
+                  '${stats.totalAdmins}/${stats.totalUsers}',
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -228,6 +191,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   String _formatDateTime(DateTime dateTime) {
-    return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+    return '${dateTime.day.toString().padLeft(2, '0')}/'
+        '${dateTime.month.toString().padLeft(2, '0')}/'
+        '${dateTime.year} '
+        '${dateTime.hour.toString().padLeft(2, '0')}:'
+        '${dateTime.minute.toString().padLeft(2, '0')}';
   }
 }

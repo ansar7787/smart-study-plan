@@ -26,6 +26,7 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     on<DeleteUserEvent>(_onDeleteUser);
     on<RefreshAdminDataEvent>(_onRefreshAdminData);
     on<SearchUsersEvent>(_onSearchUsers);
+    on<FetchUsersByRoleEvent>(_onFetchUsersByRole);
   }
 
   Future<void> _onFetchAllUsers(
@@ -156,5 +157,22 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
         emit(AdminUsersLoaded(filtered));
       },
     );
+  }
+
+  Future<void> _onFetchUsersByRole(
+    FetchUsersByRoleEvent event,
+    Emitter<AdminState> emit,
+  ) async {
+    emit(const AdminLoading(message: 'Loading users by role...'));
+
+    final result = await getAllUsersUseCase(const NoParams());
+    // If you have a separate usecase for role, use that; otherwise filter here
+
+    result.fold((failure) => emit(AdminError(failure.message)), (users) {
+      final filtered = users
+          .where((u) => u.role.toLowerCase() == event.role.toLowerCase())
+          .toList();
+      emit(AdminUsersLoaded(filtered));
+    });
   }
 }

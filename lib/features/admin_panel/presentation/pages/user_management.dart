@@ -1,30 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:smart_study_plan/di/service_locator.dart';
 import 'package:smart_study_plan/features/admin_panel/presentation/widgets/filter_button.dart';
-import '../bloc/admin_bloc.dart';
+
+import '../bloc/admin_users/admin_users_bloc.dart';
 import '../widgets/user_tile.dart';
 
-class UserManagementPage extends StatefulWidget {
+class UserManagementPage extends StatelessWidget {
   const UserManagementPage({super.key});
 
   @override
-  State<UserManagementPage> createState() => _UserManagementPageState();
+  Widget build(BuildContext context) {
+    return BlocProvider<AdminUsersBloc>(
+      create: (_) => getIt<AdminUsersBloc>()..add(const FetchUsersEvent()),
+      child: const _UserManagementView(),
+    );
+  }
 }
 
-class _UserManagementPageState extends State<UserManagementPage> {
-  String _selectedFilter = 'all';
+class _UserManagementView extends StatefulWidget {
+  const _UserManagementView();
 
   @override
-  void initState() {
-    super.initState();
-    context.read<AdminBloc>().add(const FetchAllUsersEvent());
-  }
+  State<_UserManagementView> createState() => _UserManagementViewState();
+}
+
+class _UserManagementViewState extends State<_UserManagementView> {
+  String _selectedFilter = 'all';
 
   void _handleSearch(String query) {
     if (query.isEmpty) {
-      context.read<AdminBloc>().add(const FetchAllUsersEvent());
+      context.read<AdminUsersBloc>().add(const FetchUsersEvent());
     } else {
-      context.read<AdminBloc>().add(SearchUsersEvent(query));
+      context.read<AdminUsersBloc>().add(SearchUsersEvent(query));
     }
   }
 
@@ -33,9 +41,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
       _selectedFilter = role;
     });
     if (role == 'all') {
-      context.read<AdminBloc>().add(const FetchAllUsersEvent());
+      context.read<AdminUsersBloc>().add(const FetchUsersEvent());
     } else {
-      context.read<AdminBloc>().add(FetchUsersByRoleEvent(role));
+      context.read<AdminUsersBloc>().add(FetchUsersByRoleEvent(role));
     }
   }
 
@@ -43,7 +51,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
     if (action == 'delete') {
       _showDeleteConfirmation(userId);
     } else if (action == 'view') {
-      // Show user details
+      // TODO: Implement user details page
     }
   }
 
@@ -61,7 +69,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              context.read<AdminBloc>().add(DeleteUserEvent(userId));
+              context.read<AdminUsersBloc>().add(DeleteUserEvent(userId));
             },
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
@@ -70,17 +78,17 @@ class _UserManagementPageState extends State<UserManagementPage> {
     );
   }
 
+  Future<void> _onRefresh() async {
+    context.read<AdminUsersBloc>().add(const RefreshUsersEvent());
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('User Management'), elevation: 0),
-      body: BlocListener<AdminBloc, AdminState>(
+      body: BlocListener<AdminUsersBloc, AdminUsersState>(
         listener: (context, state) {
-          if (state is AdminUserDeleted) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text(state.message)));
-          } else if (state is AdminError) {
+          if (state is UsersError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
@@ -97,13 +105,13 @@ class _UserManagementPageState extends State<UserManagementPage> {
               selectedFilter: _selectedFilter,
             ),
             Expanded(
-              child: BlocBuilder<AdminBloc, AdminState>(
+              child: BlocBuilder<AdminUsersBloc, AdminUsersState>(
                 builder: (context, state) {
-                  if (state is AdminLoading) {
+                  if (state is UsersInitial || state is UsersLoading) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  if (state is AdminError) {
+                  if (state is UsersError) {
                     return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -118,8 +126,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
                           const SizedBox(height: 16),
                           ElevatedButton(
                             onPressed: () {
-                              context.read<AdminBloc>().add(
-                                const FetchAllUsersEvent(),
+                              context.read<AdminUsersBloc>().add(
+                                const FetchUsersEvent(),
                               );
                             },
                             child: const Text('Retry'),
@@ -129,7 +137,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     );
                   }
 
-                  if (state is AdminUsersLoaded) {
+                  if (state is UsersLoaded) {
                     final users = state.users;
 
                     if (users.isEmpty) {
@@ -156,11 +164,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     }
 
                     return RefreshIndicator(
-                      onRefresh: () async {
-                        context.read<AdminBloc>().add(
-                          const FetchAllUsersEvent(),
-                        );
-                      },
+                      onRefresh: _onRefresh,
                       child: ListView.builder(
                         itemCount: users.length,
                         itemBuilder: (context, index) {
@@ -169,7 +173,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                             user: user,
                             onAction: _handleUserAction,
                             onTap: () {
-                              // Show user details
+                              // TODO: Open details page
                             },
                           );
                         },
@@ -177,26 +181,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     );
                   }
 
-                  if (state is AdminDataLoaded) {
-                    final users = state.users;
-
-                    if (users.isEmpty) {
-                      return const Center(child: Text('No users found'));
-                    }
-
-                    return ListView.builder(
-                      itemCount: users.length,
-                      itemBuilder: (context, index) {
-                        final user = users[index];
-                        return UserTile(
-                          user: user,
-                          onAction: _handleUserAction,
-                        );
-                      },
-                    );
-                  }
-
-                  return const Center(child: Text('No data'));
+                  return const SizedBox.shrink();
                 },
               ),
             ),

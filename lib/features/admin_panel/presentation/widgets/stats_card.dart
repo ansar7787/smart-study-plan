@@ -21,27 +21,39 @@ class StatsCard extends StatelessWidget {
     return Card(
       elevation: 2,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12), // slightly smaller
         decoration: BoxDecoration(
           color: backgroundColor ?? Colors.teal.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 48, color: iconColor ?? Colors.teal[700]),
-            const SizedBox(height: 12),
-            Text(
-              value.toString(),
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, color: Colors.grey),
-            ),
-          ],
+        child: FittedBox(
+          // ✅ add this
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min, // ✅ prevent full height
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 40, // smaller icon
+                color: iconColor ?? Colors.teal[700],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                value.toString(),
+                style: const TextStyle(
+                  fontSize: 22, // smaller text
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
         ),
       ),
     );
