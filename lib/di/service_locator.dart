@@ -12,7 +12,7 @@ import 'package:smart_study_plan/features/user_management/domain/usecases/login_
 import 'package:smart_study_plan/features/user_management/domain/usecases/logout_user.dart';
 import 'package:smart_study_plan/features/user_management/domain/usecases/register_user.dart';
 
-import 'core/utils/logger.dart';
+import '../core/utils/logger.dart';
 
 final getIt = GetIt.instance;
 
