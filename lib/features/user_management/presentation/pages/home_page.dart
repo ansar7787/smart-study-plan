@@ -23,6 +23,8 @@ class HomePage extends StatelessWidget {
       body: BlocBuilder<UserBloc, UserState>(
         builder: (context, state) {
           if (state is UserAuthenticated) {
+            final isAdmin = state.user.role == 'admin';
+
             return SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -59,8 +61,43 @@ class HomePage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 24),
+
+                  // Admin Section - SHOW ONLY FOR ADMINS
+                  if (isAdmin) ...[
+                    const Text(
+                      'Admin Features',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      onPressed: () =>
+                          context.pushNamed(AppRouteNames.adminDashboard),
+                      icon: const Icon(Icons.dashboard),
+                      label: const Text('Admin Dashboard'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      onPressed: () =>
+                          context.pushNamed(AppRouteNames.userManagement),
+                      icon: const Icon(Icons.supervised_user_circle),
+                      label: const Text('Manage Users'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.deepOrange,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+
                   const Text(
-                    'Phase 1 Features',
+                    'Phase 1-2 Features',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
@@ -74,31 +111,12 @@ class HomePage extends StatelessWidget {
                     'Hive database integration',
                     Icons.storage,
                   ),
-                  _buildFeatureCard(
-                    'Navigation',
-                    'GoRouter with role-based access',
-                    Icons.navigation,
-                  ),
-                  const SizedBox(height: 32),
-                  const Text(
-                    'Coming in Phase 2-8:',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                      fontStyle: FontStyle.italic,
+                  if (isAdmin)
+                    _buildFeatureCard(
+                      'Admin Panel',
+                      'User management & statistics',
+                      Icons.admin_panel_settings,
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    '• Admin Dashboard\n'
-                    '• Subject & Task Management\n'
-                    '• Study Planner & Timetable\n'
-                    '• Notifications & Reminders\n'
-                    '• Progress Tracking\n'
-                    '• Resource Management\n'
-                    '• AI Assistance',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
                 ],
               ),
             );
