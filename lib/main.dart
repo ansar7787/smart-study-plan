@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:smart_study_plan/config/routes/app_routes.dart';
+import 'package:smart_study_plan/features/admin_panel/presentation/bloc/admin_bloc.dart';
 import 'package:smart_study_plan/features/user_management/presentation/bloc/user_bloc.dart';
 import 'package:smart_study_plan/di/service_locator.dart';
 
@@ -16,7 +17,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
-      providers: [BlocProvider(create: (context) => getIt<UserBloc>())],
+      providers: [
+        BlocProvider(create: (context) => getIt<UserBloc>()),
+        BlocProvider(create: (context) => getIt<AdminBloc>()),
+      ],
       child: MaterialApp.router(
         title: 'Smart Study Planner',
         theme: ThemeData(
