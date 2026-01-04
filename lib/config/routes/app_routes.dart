@@ -1,5 +1,10 @@
 // Route names
 import 'package:go_router/go_router.dart';
+import 'package:smart_study_plan/features/user_management/presentation/pages/home_page.dart';
+import 'package:smart_study_plan/features/user_management/presentation/pages/login_page.dart';
+import 'package:smart_study_plan/features/user_management/presentation/pages/profile_page.dart';
+import 'package:smart_study_plan/features/user_management/presentation/pages/register_page.dart';
+import 'package:smart_study_plan/features/user_management/presentation/pages/splash_page.dart';
 
 class AppRouteNames {
   static const String login = 'login';

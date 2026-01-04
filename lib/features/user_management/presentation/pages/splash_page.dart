@@ -15,8 +15,9 @@ class _SplashPageState extends State<SplashPage> {
   @override
   void initState() {
     super.initState();
-    // Check authentication status
-    Future.delayed(const Duration(seconds: 2), () {
+
+    /// Trigger auth check as soon as widget is ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<UserBloc>().add(const CheckAuthStatusEvent());
     });
   }
@@ -26,23 +27,25 @@ class _SplashPageState extends State<SplashPage> {
     return Scaffold(
       body: BlocListener<UserBloc, UserState>(
         listener: (context, state) {
+          if (!mounted) return;
+
           if (state is UserAuthenticated) {
             context.goNamed(AppRouteNames.home);
           } else if (state is UserNotAuthenticated) {
             context.goNamed(AppRouteNames.login);
           }
         },
-        child: Center(
+        child: const Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.school, size: 64, color: Colors.teal),
-              const SizedBox(height: 16),
-              const Text(
+              Icon(Icons.school, size: 64, color: Colors.teal),
+              SizedBox(height: 16),
+              Text(
                 'Smart Study Planner',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 32),
+              SizedBox(height: 32),
               CircularProgressIndicator(),
             ],
           ),
