@@ -1,8 +1,9 @@
 import 'package:dartz/dartz.dart';
 import 'package:equatable/equatable.dart';
+import 'package:smart_study_plan/core/error/failures.dart';
+import 'package:smart_study_plan/core/usecase/usecase.dart';
+
 import '../repositories/admin_repository.dart';
-import '../../../../core/error/failures.dart';
-import '../../../../core/usecase/usecase.dart';
 
 class DeleteUserAdminUseCase extends UseCase<void, DeleteUserParams> {
   final AdminRepository repository;

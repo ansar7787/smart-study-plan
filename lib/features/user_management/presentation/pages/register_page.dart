@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+
 import 'package:smart_study_plan/config/routes/app_routes.dart';
 import 'package:smart_study_plan/features/user_management/presentation/bloc/user_bloc.dart';
-import 'package:smart_study_plan/features/user_management/presentation/widgets/custom_text_field.dart';
+import 'package:smart_study_plan/features/user_management/presentation/widgets/auth_text_field.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -14,261 +16,274 @@ class RegisterPage extends StatefulWidget {
 
 class _RegisterPageState extends State<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
 
-  String _selectedRole = 'student';
+  final _name = TextEditingController();
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+  final _confirm = TextEditingController();
+
+  final _nameFocus = FocusNode();
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
+  final _confirmFocus = FocusNode();
+
+  bool _hidePassword = true;
+  bool _hideConfirm = true;
+  bool _registerSuccess = false;
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
+    _name.dispose();
+    _email.dispose();
+    _password.dispose();
+    _confirm.dispose();
+
+    _nameFocus.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
+    _confirmFocus.dispose();
+
     super.dispose();
   }
 
-  void _handleRegister() {
-    if (_formKey.currentState!.validate()) {
-      context.read<UserBloc>().add(
-        RegisterUserEvent(
-          name: _nameController.text.trim(),
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-          role: _selectedRole,
-        ),
-      );
+  void _register() {
+    FocusScope.of(context).unfocus();
+
+    if (!_formKey.currentState!.validate()) {
+      HapticFeedback.mediumImpact();
+      return;
     }
+
+    HapticFeedback.lightImpact();
+
+    context.read<UserBloc>().add(
+      RegisterUserEvent(
+        name: _name.text.trim(),
+        email: _email.text.trim(),
+        password: _password.text,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      body: GestureDetector(
-        onTap: () => FocusScope.of(context).unfocus(),
-        child: BlocListener<UserBloc, UserState>(
-          listener: (context, state) {
-            if (state is UserAuthenticated) {
-              if (!mounted) return;
-              context.goNamed(AppRouteNames.home);
-            }
+      resizeToAvoidBottomInset: false, // ⭐ prevents keyboard jump
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: BlocListener<UserBloc, UserState>(
+        listenWhen: (p, c) => p is UserLoading && c is! UserLoading,
+        listener: (context, state) {
+          /// REGISTER SUCCESS
+          if (state is UserRegisterSuccess) {
+            setState(() => _registerSuccess = true);
 
-            if (state is UserError) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
-          },
-          child: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Form(
-                key: _formKey,
-                child: BlocBuilder<UserBloc, UserState>(
-                  builder: (context, state) {
-                    final isLoading = state is UserLoading;
+            Future.delayed(const Duration(milliseconds: 500), () {
+              context.goNamed(AppRouteNames.login);
+            });
+          }
 
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const SizedBox(height: 24),
-                        const Text(
-                          'Create Account',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Join Smart Study Planner',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 14, color: Colors.grey),
-                        ),
-                        const SizedBox(height: 32),
-
-                        /// Full Name
-                        CustomTextField(
-                          label: 'Full Name',
-                          hintText: 'Enter your full name',
-                          controller: _nameController,
-                          enabled: !isLoading,
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Name is required';
-                            }
-                            return null;
-                          },
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        /// Email
-                        CustomTextField(
-                          label: 'Email',
-                          hintText: 'Enter your email',
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          enabled: !isLoading,
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Email is required';
-                            }
-                            final emailRegex = RegExp(
-                              r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
-                            );
-                            if (!emailRegex.hasMatch(value.trim())) {
-                              return 'Enter a valid email';
-                            }
-                            return null;
-                          },
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        /// Role
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Account Type',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w500,
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey[300]!),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: DropdownButton<String>(
-                                value: _selectedRole,
-                                isExpanded: true,
-                                underline: const SizedBox(),
-                                onChanged: isLoading
-                                    ? null
-                                    : (value) {
-                                        setState(() {
-                                          _selectedRole = value!;
-                                        });
-                                      },
-                                items: const ['student', 'admin']
-                                    .map(
-                                      (role) => DropdownMenuItem(
-                                        value: role,
-                                        child: Padding(
-                                          padding: EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 12,
-                                          ),
-                                          child: Text(role.toUpperCase()),
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
-                              ),
+          /// ERROR
+          if (state is UserError) {
+            HapticFeedback.heavyImpact();
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(state.message)));
+          }
+        },
+        child: SafeArea(
+          child: GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.all(24),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
+                    child: Center(
+                      child: Container(
+                        width: 420,
+                        padding: const EdgeInsets.all(28),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.06),
+                              blurRadius: 30,
+                              offset: const Offset(0, 10),
                             ),
                           ],
                         ),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Create account',
+                                style: theme.textTheme.headlineMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Sign up to start planning smarter',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: const Color(0xFF64748B),
+                                ),
+                              ),
 
-                        const SizedBox(height: 16),
+                              const SizedBox(height: 32),
 
-                        /// Password
-                        CustomTextField(
-                          label: 'Password',
-                          hintText: 'Enter your password',
-                          controller: _passwordController,
-                          obscureText: true,
-                          enabled: !isLoading,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Password is required';
-                            }
-                            if (value.length < 6) {
-                              return 'Password must be at least 6 characters';
-                            }
-                            return null;
-                          },
-                        ),
+                              /// NAME
+                              AuthTextField(
+                                label: 'Full name',
+                                controller: _name,
+                                focusNode: _nameFocus,
+                                nextFocusNode: _emailFocus,
+                                hint: 'John Doe',
+                                icon: Icons.person_outline,
+                                validator: (v) => v == null || v.isEmpty
+                                    ? 'Name is required'
+                                    : null,
+                              ),
 
-                        const SizedBox(height: 16),
+                              const SizedBox(height: 16),
 
-                        /// Confirm Password
-                        CustomTextField(
-                          label: 'Confirm Password',
-                          hintText: 'Confirm your password',
-                          controller: _confirmPasswordController,
-                          obscureText: true,
-                          enabled: !isLoading,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please confirm password';
-                            }
-                            if (value != _passwordController.text) {
-                              return 'Passwords do not match';
-                            }
-                            return null;
-                          },
-                        ),
+                              /// EMAIL
+                              AuthTextField(
+                                label: 'Email',
+                                controller: _email,
+                                focusNode: _emailFocus,
+                                nextFocusNode: _passwordFocus,
+                                hint: 'you@example.com',
+                                icon: Icons.email_outlined,
+                                keyboardType: TextInputType.emailAddress,
+                                validator: (v) => v == null || !v.contains('@')
+                                    ? 'Enter a valid email'
+                                    : null,
+                              ),
 
-                        const SizedBox(height: 32),
+                              const SizedBox(height: 16),
 
-                        /// Register Button
-                        ElevatedButton(
-                          onPressed: isLoading ? null : _handleRegister,
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            backgroundColor: Colors.teal,
-                          ),
-                          child: isLoading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
-                                    ),
+                              /// PASSWORD
+                              AuthTextField(
+                                label: 'Password',
+                                controller: _password,
+                                focusNode: _passwordFocus,
+                                nextFocusNode: _confirmFocus,
+                                hint: '••••••••',
+                                icon: Icons.lock_outline,
+                                obscureText: _hidePassword,
+                                validator: (v) => v != null && v.length >= 6
+                                    ? null
+                                    : 'Minimum 6 characters',
+                                suffix: IconButton(
+                                  onPressed: () => setState(
+                                    () => _hidePassword = !_hidePassword,
                                   ),
-                                )
-                              : const Text(
-                                  'Register',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
+                                  icon: Icon(
+                                    _hidePassword
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
                                   ),
                                 ),
-                        ),
+                              ),
 
-                        const SizedBox(height: 24),
+                              const SizedBox(height: 16),
 
-                        /// Login link
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text('Already have an account? '),
-                            TextButton(
-                              onPressed: isLoading
-                                  ? null
-                                  : () => context.goNamed(AppRouteNames.login),
-                              child: const Text('Login'),
-                            ),
-                          ],
+                              /// CONFIRM PASSWORD
+                              AuthTextField(
+                                label: 'Confirm password',
+                                controller: _confirm,
+                                focusNode: _confirmFocus,
+                                hint: '••••••••',
+                                icon: Icons.lock_outline,
+                                obscureText: _hideConfirm,
+                                validator: (v) => v == _password.text
+                                    ? null
+                                    : 'Passwords do not match',
+                                suffix: IconButton(
+                                  onPressed: () => setState(
+                                    () => _hideConfirm = !_hideConfirm,
+                                  ),
+                                  icon: Icon(
+                                    _hideConfirm
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 28),
+
+                              /// REGISTER BUTTON
+                              BlocBuilder<UserBloc, UserState>(
+                                builder: (context, state) {
+                                  final loading = state is UserLoading;
+
+                                  return SizedBox(
+                                    width: double.infinity,
+                                    height: 52,
+                                    child: ElevatedButton(
+                                      onPressed: loading ? null : _register,
+                                      child: AnimatedSwitcher(
+                                        duration: const Duration(
+                                          milliseconds: 250,
+                                        ),
+                                        child: loading
+                                            ? const SizedBox(
+                                                key: ValueKey('loading'),
+                                                height: 22,
+                                                width: 22,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2.5,
+                                                      color: Colors.white,
+                                                    ),
+                                              )
+                                            : _registerSuccess
+                                            ? const Icon(
+                                                Icons.check,
+                                                key: ValueKey('success'),
+                                                color: Colors.white,
+                                              )
+                                            : const Text(
+                                                'Create account',
+                                                key: ValueKey('text'),
+                                              ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              const SizedBox(height: 20),
+
+                              Center(
+                                child: TextButton(
+                                  onPressed: () =>
+                                      context.goNamed(AppRouteNames.login),
+                                  child: const Text(
+                                    'Already have an account? Login',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
-                    );
-                  },
-                ),
-              ),
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ),

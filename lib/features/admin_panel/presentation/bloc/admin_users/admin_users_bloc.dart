@@ -18,10 +18,10 @@ class AdminUsersBloc extends Bloc<AdminUsersEvent, AdminUsersState> {
     required this.deleteUserAdminUseCase,
   }) : super(const UsersInitial()) {
     on<FetchUsersEvent>(_onFetchUsers);
+    on<RefreshUsersEvent>(_onRefreshUsers);
     on<FetchUsersByRoleEvent>(_onFetchUsersByRole);
     on<SearchUsersEvent>(_onSearchUsers);
     on<DeleteUserEvent>(_onDeleteUser);
-    on<RefreshUsersEvent>(_onRefreshUsers);
   }
 
   Future<void> _onFetchUsers(
@@ -29,10 +29,12 @@ class AdminUsersBloc extends Bloc<AdminUsersEvent, AdminUsersState> {
     Emitter<AdminUsersState> emit,
   ) async {
     emit(const UsersLoading());
+
     final result = await getAllUsersUseCase(const NoParams());
+
     result.fold(
       (failure) {
-        AppLogger.e('Failed to fetch users: ${failure.message}');
+        AppLogger.e('Fetch users failed: ${failure.message}');
         emit(UsersError(failure.message));
       },
       (users) {
@@ -41,16 +43,23 @@ class AdminUsersBloc extends Bloc<AdminUsersEvent, AdminUsersState> {
     );
   }
 
+  Future<void> _onRefreshUsers(
+    RefreshUsersEvent event,
+    Emitter<AdminUsersState> emit,
+  ) async {
+    add(const FetchUsersEvent());
+  }
+
   Future<void> _onFetchUsersByRole(
     FetchUsersByRoleEvent event,
     Emitter<AdminUsersState> emit,
   ) async {
     emit(const UsersLoading());
+
     final result = await getAllUsersUseCase(const NoParams());
+
     result.fold((failure) => emit(UsersError(failure.message)), (users) {
-      final filtered = users
-          .where((u) => u.role.toLowerCase() == event.role.toLowerCase())
-          .toList();
+      final filtered = users.where((u) => u.role == event.role).toList();
       emit(UsersLoaded(filtered));
     });
   }
@@ -60,15 +69,13 @@ class AdminUsersBloc extends Bloc<AdminUsersEvent, AdminUsersState> {
     Emitter<AdminUsersState> emit,
   ) async {
     final result = await getAllUsersUseCase(const NoParams());
+
     result.fold((failure) => emit(UsersError(failure.message)), (users) {
-      final q = event.query.toLowerCase();
-      final filtered = users
-          .where(
-            (u) =>
-                u.name.toLowerCase().contains(q) ||
-                u.email.toLowerCase().contains(q),
-          )
-          .toList();
+      final query = event.query.toLowerCase();
+      final filtered = users.where((u) {
+        return u.name.toLowerCase().contains(query) ||
+            u.email.toLowerCase().contains(query);
+      }).toList();
       emit(UsersLoaded(filtered));
     });
   }
@@ -79,9 +86,11 @@ class AdminUsersBloc extends Bloc<AdminUsersEvent, AdminUsersState> {
   ) async {
     final currentState = state;
     emit(const UsersLoading());
+
     final result = await deleteUserAdminUseCase(
       DeleteUserParams(userId: event.userId),
     );
+
     result.fold((failure) => emit(UsersError(failure.message)), (_) {
       if (currentState is UsersLoaded) {
         final updated = currentState.users
@@ -92,12 +101,5 @@ class AdminUsersBloc extends Bloc<AdminUsersEvent, AdminUsersState> {
         add(const FetchUsersEvent());
       }
     });
-  }
-
-  Future<void> _onRefreshUsers(
-    RefreshUsersEvent event,
-    Emitter<AdminUsersState> emit,
-  ) async {
-    add(const FetchUsersEvent());
   }
 }

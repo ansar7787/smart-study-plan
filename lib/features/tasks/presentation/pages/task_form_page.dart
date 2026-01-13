@@ -1,43 +1,44 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+
+import '../../../../core/bloc/base_state.dart';
+import '../../../../core/bloc/view_state.dart';
 import '../../domain/entities/task.dart';
 import '../bloc/task_bloc.dart';
+import '../bloc/task_event.dart';
 
 class TaskFormPage extends StatefulWidget {
   final Task? task;
   final String? subjectId;
-  final String userId;
 
-  const TaskFormPage({
-    super.key,
-    this.task,
-    this.subjectId,
-    required this.userId,
-  });
+  const TaskFormPage({super.key, this.task, this.subjectId});
 
   @override
   State<TaskFormPage> createState() => _TaskFormPageState();
 }
 
 class _TaskFormPageState extends State<TaskFormPage> {
-  late TextEditingController _titleController;
-  late TextEditingController _descriptionController;
-  late DateTime _selectedDate;
-  late int _selectedPriority;
-  late String _selectedSubjectId;
+  late final TextEditingController _titleController;
+  late final TextEditingController _descriptionController;
+  late DateTime _dueDate;
+  int _priority = 2;
+  String _status = 'todo';
 
   @override
   void initState() {
     super.initState();
+
     _titleController = TextEditingController(text: widget.task?.title ?? '');
     _descriptionController = TextEditingController(
       text: widget.task?.description ?? '',
     );
-    _selectedDate = widget.task?.dueDate ?? DateTime.now();
-    _selectedPriority = widget.task?.priority ?? 2;
-    _selectedSubjectId = widget.task?.subjectId ?? widget.subjectId ?? '';
+
+    _dueDate =
+        widget.task?.dueDate ?? DateTime.now().add(const Duration(days: 1));
+
+    _priority = widget.task?.priority ?? 2;
+    _status = widget.task?.status ?? 'todo';
   }
 
   @override
@@ -48,30 +49,24 @@ class _TaskFormPageState extends State<TaskFormPage> {
   }
 
   void _saveTask() {
-    if (_titleController.text.isEmpty) {
+    if (_titleController.text.trim().isEmpty) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Task title is required')));
       return;
     }
-    if (_selectedSubjectId.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Subject is required')));
-      return;
-    }
 
     final task = Task(
       id: widget.task?.id ?? const Uuid().v4(),
-      title: _titleController.text,
-      description: _descriptionController.text.isEmpty
-          ? null
-          : _descriptionController.text,
-      subjectId: _selectedSubjectId,
-      dueDate: _selectedDate,
-      isCompleted: widget.task?.isCompleted ?? false,
-      priority: _selectedPriority,
-      userId: widget.userId,
+      title: _titleController.text.trim(),
+      description: _descriptionController.text.trim(),
+      subjectId: widget.task?.subjectId ?? widget.subjectId!,
+      userId: widget.task?.userId ?? '',
+      dueDate: _dueDate,
+      priority: _priority,
+      status: _status,
+      isCompleted: _status == 'completed',
+      tags: widget.task?.tags ?? [],
       createdAt: widget.task?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -89,117 +84,136 @@ class _TaskFormPageState extends State<TaskFormPage> {
       appBar: AppBar(
         title: Text(widget.task == null ? 'Add Task' : 'Edit Task'),
       ),
-      body: BlocListener<TaskBloc, TaskState>(
+      body: BlocListener<TaskBloc, BaseState<List<Task>>>(
         listener: (context, state) {
-          if (state is TaskCreated || state is TaskUpdated) {
+          final viewState = state.viewState;
+
+          if (viewState is ViewFailure<List<Task>>) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(viewState.message)));
+          }
+
+          if (viewState is ViewSuccess<List<Task>>) {
             Navigator.pop(context);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  state is TaskCreated ? 'Task created' : 'Task updated',
+                  widget.task == null
+                      ? 'Task created successfully'
+                      : 'Task updated successfully',
                 ),
               ),
             );
-          } else if (state is TaskError) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text('Error: ${state.message}')));
           }
         },
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              // Title
-              TextField(
-                controller: _titleController,
-                decoration: InputDecoration(
-                  labelText: 'Task Title *',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Description
-              TextField(
-                controller: _descriptionController,
-                decoration: InputDecoration(
-                  labelText: 'Description',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-              // Due Date
-              GestureDetector(
-                onTap: () async {
-                  final date = await showDatePicker(
-                    context: context,
-                    initialDate: _selectedDate,
-                    firstDate: DateTime.now(),
-                    lastDate: DateTime(2099),
-                  );
-                  if (date != null) {
-                    setState(() {
-                      _selectedDate = date;
-                    });
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Due Date: ${DateFormat('MMM dd, yyyy').format(_selectedDate)}',
-                      ),
-                      const Icon(Icons.calendar_today),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Priority
-              DropdownButtonFormField<int>(
-                initialValue: _selectedPriority,
-                decoration: InputDecoration(
-                  labelText: 'Priority',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 1, child: Text('Low')),
-                  DropdownMenuItem(value: 2, child: Text('Medium')),
-                  DropdownMenuItem(value: 3, child: Text('High')),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    _selectedPriority = value ?? 2;
-                  });
-                },
-              ),
-
-              const SizedBox(height: 24),
-              // Save button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _saveTask,
-                  child: const Text('Save Task'),
-                ),
-              ),
-            ],
-          ),
-        ),
+        child: _buildForm(),
       ),
     );
+  }
+
+  Widget _buildForm() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          TextField(
+            controller: _titleController,
+            decoration: InputDecoration(
+              labelText: 'Title *',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          TextField(
+            controller: _descriptionController,
+            maxLines: 3,
+            decoration: InputDecoration(
+              labelText: 'Description',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Due Date'),
+            subtitle: Text(
+              '${_dueDate.day}/${_dueDate.month}/${_dueDate.year}',
+            ),
+            trailing: const Icon(Icons.calendar_today),
+            onTap: _pickDate,
+          ),
+
+          const SizedBox(height: 16),
+
+          DropdownButtonFormField<int>(
+            initialValue: _priority,
+            decoration: InputDecoration(
+              labelText: 'Priority',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            items: const [
+              DropdownMenuItem(value: 1, child: Text('Low')),
+              DropdownMenuItem(value: 2, child: Text('Medium')),
+              DropdownMenuItem(value: 3, child: Text('High')),
+            ],
+            onChanged: (v) => setState(() => _priority = v ?? 2),
+          ),
+
+          const SizedBox(height: 16),
+
+          DropdownButtonFormField<String>(
+            initialValue: _status,
+            decoration: InputDecoration(
+              labelText: 'Status',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'todo', child: Text('To Do')),
+              DropdownMenuItem(
+                value: 'in_progress',
+                child: Text('In Progress'),
+              ),
+              DropdownMenuItem(value: 'completed', child: Text('Completed')),
+              DropdownMenuItem(value: 'on_hold', child: Text('On Hold')),
+            ],
+            onChanged: (v) => setState(() => _status = v ?? 'todo'),
+          ),
+
+          const SizedBox(height: 24),
+
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _saveTask,
+              child: const Text('Save Task'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dueDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+
+    if (picked != null) {
+      setState(() => _dueDate = picked);
+    }
   }
 }

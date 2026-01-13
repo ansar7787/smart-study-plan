@@ -8,7 +8,7 @@ part of 'subject_model.dart';
 
 class SubjectModelAdapter extends TypeAdapter<SubjectModel> {
   @override
-  final int typeId = 3;
+  final int typeId = 0;
 
   @override
   SubjectModel read(BinaryReader reader) {

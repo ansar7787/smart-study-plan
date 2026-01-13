@@ -56,3 +56,21 @@ class UserUpdated extends UserState {
   @override
   List<Object?> get props => [user, message];
 }
+
+class UserLoginSuccess extends UserState {
+  final User user;
+
+  const UserLoginSuccess(this.user);
+
+  @override
+  List<Object?> get props => [user];
+}
+
+class UserRegisterSuccess extends UserState {
+  final User user;
+
+  const UserRegisterSuccess(this.user);
+
+  @override
+  List<Object?> get props => [user];
+}

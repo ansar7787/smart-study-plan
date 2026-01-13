@@ -1,15 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
-import '../../../../core/error/exceptions.dart';
-import '../../../../core/utils/logger.dart';
 
 abstract class UserRemoteDatasource {
   Future<UserModel> registerUser({
     required String email,
     required String password,
     required String name,
-    required String role,
   });
 
   Future<UserModel> loginUser({
@@ -19,62 +16,48 @@ abstract class UserRemoteDatasource {
 
   Future<void> logoutUser();
 
+  Future<void> resetPassword(String email);
+
+  Future<UserModel?> getCurrentUser();
+
   Future<UserModel> getUser(String userId);
 
   Future<void> updateUser(UserModel user);
 
-  Future<UserModel?> getCurrentUser();
+  Future<void> deleteUser(String userId);
 }
 
 class UserRemoteDatasourceImpl implements UserRemoteDatasource {
-  final FirebaseAuth _firebaseAuth;
-  final FirebaseFirestore _firestore;
+  final FirebaseAuth auth;
+  final FirebaseFirestore firestore;
 
-  UserRemoteDatasourceImpl(this._firebaseAuth, this._firestore);
+  UserRemoteDatasourceImpl(this.auth, this.firestore);
 
   @override
   Future<UserModel> registerUser({
     required String email,
     required String password,
     required String name,
-    required String role,
   }) async {
-    try {
-      final userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+    final cred = await auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
 
-      final user = userCredential.user;
-      if (user == null) {
-        throw AuthFirebaseException('User creation failed');
-      }
+    final user = cred.user!;
+    final now = DateTime.now();
 
-      final userModel = UserModel(
-        id: user.uid,
-        email: email,
-        name: name,
-        role: role,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
+    final model = UserModel(
+      id: user.uid,
+      email: email,
+      name: name,
+      role: 'student', // 🔐 FORCE
+      createdAt: now,
+      updatedAt: now,
+    );
 
-      // Save to Firestore
-      await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .set(userModel.toJson());
-
-      AppLogger.d('User registered: $email with role: $role');
-      return userModel;
-    } on FirebaseAuthException catch (e) {
-      throw AuthFirebaseException(
-        e.message ?? 'Registration failed',
-        code: e.code,
-      );
-    } catch (e) {
-      throw AuthFirebaseException('Registration failed: $e');
-    }
+    await firestore.collection('users').doc(user.uid).set(model.toJson());
+    return model;
   }
 
   @override
@@ -82,85 +65,52 @@ class UserRemoteDatasourceImpl implements UserRemoteDatasource {
     required String email,
     required String password,
   }) async {
-    try {
-      final userCredential = await _firebaseAuth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+    final cred = await auth.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
 
-      final user = userCredential.user;
-      if (user == null) {
-        throw AuthFirebaseException('Login failed');
-      }
+    final doc = await firestore.collection('users').doc(cred.user!.uid).get();
 
-      final userDoc = await _firestore.collection('users').doc(user.uid).get();
-
-      if (!userDoc.exists) {
-        throw AuthFirebaseException('User profile not found');
-      }
-
-      AppLogger.d('User logged in: $email');
-      return UserModel.fromJson(userDoc.data() as Map<String, dynamic>);
-    } on FirebaseAuthException catch (e) {
-      throw AuthFirebaseException(e.message ?? 'Login failed', code: e.code);
-    } catch (e) {
-      throw AuthFirebaseException('Login failed: $e');
-    }
+    return UserModel.fromJson(doc.data()!);
   }
 
   @override
-  Future<void> logoutUser() async {
-    try {
-      await _firebaseAuth.signOut();
-      AppLogger.d('User logged out');
-    } catch (e) {
-      throw AuthFirebaseException('Logout failed: $e');
-    }
+  Future<void> logoutUser() async => auth.signOut();
+
+  @override
+  Future<UserModel?> getCurrentUser() async {
+    final user = auth.currentUser;
+    if (user == null) return null;
+
+    final doc = await firestore.collection('users').doc(user.uid).get();
+    if (!doc.exists) return null;
+
+    return UserModel.fromJson(doc.data()!);
   }
 
   @override
   Future<UserModel> getUser(String userId) async {
-    try {
-      final doc = await _firestore.collection('users').doc(userId).get();
-
-      if (!doc.exists) {
-        throw AuthFirebaseException('User not found');
-      }
-
-      return UserModel.fromJson(doc.data() as Map<String, dynamic>);
-    } catch (e) {
-      throw AuthFirebaseException('Failed to get user: $e');
-    }
+    final doc = await firestore.collection('users').doc(userId).get();
+    return UserModel.fromJson(doc.data()!);
   }
 
   @override
   Future<void> updateUser(UserModel user) async {
-    try {
-      await _firestore.collection('users').doc(user.id).update({
-        'name': user.name,
-        'photoUrl': user.photoUrl,
-        'updatedAt': user.updatedAt.toIso8601String(),
-      });
-      AppLogger.d('User updated: ${user.id}');
-    } catch (e) {
-      throw AuthFirebaseException('Failed to update user: $e');
-    }
+    await firestore.collection('users').doc(user.id).update({
+      'name': user.name,
+      'photoUrl': user.photoUrl,
+      'updatedAt': user.updatedAt.toIso8601String(),
+    });
   }
 
   @override
-  Future<UserModel?> getCurrentUser() async {
-    try {
-      final user = _firebaseAuth.currentUser;
-      if (user == null) return null;
+  Future<void> deleteUser(String userId) async {
+    await firestore.collection('users').doc(userId).delete();
+  }
 
-      final doc = await _firestore.collection('users').doc(user.uid).get();
-
-      if (!doc.exists) return null;
-
-      return UserModel.fromJson(doc.data() as Map<String, dynamic>);
-    } catch (e) {
-      AppLogger.e('Failed to get current user: $e');
-      return null;
-    }
+  @override
+  Future<void> resetPassword(String email) async {
+    await auth.sendPasswordResetEmail(email: email);
   }
 }

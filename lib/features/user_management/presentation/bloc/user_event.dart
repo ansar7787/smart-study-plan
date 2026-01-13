@@ -11,17 +11,15 @@ class RegisterUserEvent extends UserEvent {
   final String email;
   final String password;
   final String name;
-  final String role;
 
   const RegisterUserEvent({
     required this.email,
     required this.password,
     required this.name,
-    required this.role,
   });
 
   @override
-  List<Object?> get props => [email, password, name, role];
+  List<Object?> get props => [email, password, name];
 }
 
 class LoginUserEvent extends UserEvent {
@@ -55,4 +53,12 @@ class UpdateUserEvent extends UserEvent {
 
   @override
   List<Object?> get props => [userId, name, photoUrl];
+}
+
+class ResetPasswordEvent extends UserEvent {
+  final String email;
+  const ResetPasswordEvent(this.email);
+
+  @override
+  List<Object?> get props => [email];
 }

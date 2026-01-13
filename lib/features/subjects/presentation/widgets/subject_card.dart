@@ -3,105 +3,117 @@ import '../../domain/entities/subject.dart';
 
 class SubjectCard extends StatelessWidget {
   final Subject subject;
-  final VoidCallback onTap;
-  final VoidCallback onDelete;
-  final VoidCallback onEdit;
+  final VoidCallback onEdit; // TAP CARD
+  final VoidCallback onViewTasks; // BUTTON
+  final VoidCallback onDelete; // SWIPE
 
   const SubjectCard({
     super.key,
     required this.subject,
-    required this.onTap,
-    required this.onDelete,
     required this.onEdit,
+    required this.onViewTasks,
+    required this.onDelete,
   });
 
-  Color _getColorFromHex(String hexColor) {
-    final hex = hexColor.replaceFirst('#', '');
-    return Color(int.parse('FF$hex', radix: 16));
+  Color _hexToColor(String hex) {
+    final value = hex.replaceFirst('#', '');
+    return Color(int.parse('FF$value', radix: 16));
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Card(
-        elevation: 2,
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    final theme = Theme.of(context);
+    final baseColor = _hexToColor(subject.color);
+
+    return Dismissible(
+      key: ValueKey(subject.id),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) async {
+        onDelete();
+        return true;
+      },
+      background: const SizedBox(),
+      secondaryBackground: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.only(right: 24),
+        alignment: Alignment.centerRight,
+        decoration: BoxDecoration(
+          color: Colors.red.withValues(alpha: 0.95),
+          borderRadius: BorderRadius.circular(26),
+        ),
+        child: const Icon(Icons.delete_rounded, color: Colors.white, size: 28),
+      ),
+
+      // ================= CARD =================
+      child: InkWell(
+        onTap: onEdit, // ✅ CARD TAP = EDIT
+        borderRadius: BorderRadius.circular(26),
         child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(26),
             gradient: LinearGradient(
-              colors: [
-                _getColorFromHex(subject.color),
-                _getColorFromHex(subject.color).withValues(alpha: 0.7),
-              ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
+              colors: [baseColor, baseColor.withValues(alpha: 0.85)],
             ),
+            boxShadow: [
+              BoxShadow(
+                color: baseColor.withValues(alpha: 0.35),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
-          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      subject.name,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  PopupMenuButton(
-                    onSelected: (value) {
-                      if (value == 'edit') {
-                        onEdit();
-                      } else if (value == 'delete') {
-                        onDelete();
-                      }
-                    },
-                    itemBuilder: (BuildContext context) => [
-                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Text('Delete'),
-                      ),
-                    ],
-                  ),
-                ],
+              // ---------- TITLE ----------
+              Text(
+                subject.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-              const SizedBox(height: 8),
-              // Description
-              if (subject.description != null)
+
+              // ---------- DESCRIPTION ----------
+              if (subject.description?.isNotEmpty ?? false) ...[
+                const SizedBox(height: 8),
                 Text(
                   subject.description!,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 14, color: Colors.white70),
-                ),
-              const SizedBox(height: 12),
-              // Footer info
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Credits: ${subject.credits}',
-                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.9),
                   ),
-                  if (subject.teacher != null)
-                    Text(
-                      subject.teacher!,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.white70,
-                      ),
+                ),
+              ],
+
+              const SizedBox(height: 18),
+
+              // ---------- VIEW TASKS BUTTON ----------
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: onViewTasks, // ✅ VIEW TASKS ONLY
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: Colors.white.withValues(alpha: 0.18),
+                    fixedSize: Size(130, 40),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
                     ),
-                ],
+                  ),
+                  icon: const Icon(Icons.chevron_right_rounded, size: 18),
+                  label: const Text(
+                    'View tasks',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
               ),
             ],
           ),

@@ -19,13 +19,13 @@ class AdminStatsModel {
 
   factory AdminStatsModel.fromJson(Map<String, dynamic> json) {
     return AdminStatsModel(
-      totalUsers: json['totalUsers'] as int? ?? 0,
-      totalStudents: json['totalStudents'] as int? ?? 0,
-      totalAdmins: json['totalAdmins'] as int? ?? 0,
-      totalSubjects: json['totalSubjects'] as int? ?? 0,
-      totalTasks: json['totalTasks'] as int? ?? 0,
+      totalUsers: json['totalUsers'] ?? 0,
+      totalStudents: json['totalStudents'] ?? 0,
+      totalAdmins: json['totalAdmins'] ?? 0,
+      totalSubjects: json['totalSubjects'] ?? 0,
+      totalTasks: json['totalTasks'] ?? 0,
       lastUpdated: json['lastUpdated'] != null
-          ? DateTime.parse(json['lastUpdated'] as String)
+          ? DateTime.parse(json['lastUpdated'])
           : DateTime.now(),
     );
   }
@@ -49,17 +49,6 @@ class AdminStatsModel {
       totalSubjects: totalSubjects,
       totalTasks: totalTasks,
       lastUpdated: lastUpdated,
-    );
-  }
-
-  factory AdminStatsModel.fromEntity(AdminStats stats) {
-    return AdminStatsModel(
-      totalUsers: stats.totalUsers,
-      totalStudents: stats.totalStudents,
-      totalAdmins: stats.totalAdmins,
-      totalSubjects: stats.totalSubjects,
-      totalTasks: stats.totalTasks,
-      lastUpdated: stats.lastUpdated,
     );
   }
 }

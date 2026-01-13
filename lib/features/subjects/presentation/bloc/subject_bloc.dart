@@ -1,88 +1,99 @@
-import 'package:bloc/bloc.dart';
-import 'package:equatable/equatable.dart';
-import 'package:smart_study_plan/features/subjects/domain/entities/subject.dart';
-import 'package:smart_study_plan/features/subjects/domain/usecases/create_subject.dart';
-import 'package:smart_study_plan/features/subjects/domain/usecases/delete_subject.dart';
-import 'package:smart_study_plan/features/subjects/domain/usecases/get_subjects.dart';
-import 'package:smart_study_plan/features/subjects/domain/usecases/update_subject.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:smart_study_plan/core/bloc/base_bloc.dart';
+import 'package:smart_study_plan/core/bloc/base_state.dart';
+import 'package:smart_study_plan/core/bloc/view_state.dart';
 
-part 'subject_event.dart';
-part 'subject_state.dart';
+import '../../domain/entities/subject.dart';
+import '../../domain/usecases/create_subject.dart';
+import '../../domain/usecases/delete_subject.dart';
+import '../../domain/usecases/get_subjects.dart';
+import '../../domain/usecases/update_subject.dart';
+import 'subject_event.dart';
 
-class SubjectBloc extends Bloc<SubjectEvent, SubjectState> {
-  final GetSubjectsByUserUsecase getSubjectsByUserUsecase;
-  final CreateSubjectUsecase createSubjectUsecase;
-  final UpdateSubjectUsecase updateSubjectUsecase;
-  final DeleteSubjectUsecase deleteSubjectUsecase;
+class SubjectBloc extends BaseBloc<SubjectEvent, List<Subject>> {
+  final GetSubjectsByUserUsecase getSubjectsByUser;
+  final CreateSubjectUsecase createSubject;
+  final UpdateSubjectUsecase updateSubject;
+  final DeleteSubjectUsecase deleteSubject;
 
   SubjectBloc({
-    required this.getSubjectsByUserUsecase,
-    required this.createSubjectUsecase,
-    required this.updateSubjectUsecase,
-    required this.deleteSubjectUsecase,
-  }) : super(const SubjectInitial()) {
+    required this.getSubjectsByUser,
+    required this.createSubject,
+    required this.updateSubject,
+    required this.deleteSubject,
+  }) : super(BaseState.initial()) {
     on<LoadSubjectsEvent>(_onLoadSubjects);
     on<CreateSubjectEvent>(_onCreateSubject);
     on<UpdateSubjectEvent>(_onUpdateSubject);
     on<DeleteSubjectEvent>(_onDeleteSubject);
   }
 
-  // Load all subjects for user
   Future<void> _onLoadSubjects(
     LoadSubjectsEvent event,
-    Emitter<SubjectState> emit,
+    Emitter<BaseState<List<Subject>>> emit,
   ) async {
-    emit(const SubjectLoading());
-    final result = await getSubjectsByUserUsecase(
+    emitLoading(emit);
+
+    final result = await getSubjectsByUser(
       GetSubjectsParams(userId: event.userId),
     );
+
     result.fold(
-      (failure) => emit(SubjectError(failure.message)),
-      (subjects) => emit(SubjectListLoaded(subjects)),
+      (failure) => emitFailure(emit, failure),
+      (subjects) => emitSuccess(emit, subjects),
     );
   }
 
-  // Create subject
   Future<void> _onCreateSubject(
     CreateSubjectEvent event,
-    Emitter<SubjectState> emit,
+    Emitter<BaseState<List<Subject>>> emit,
   ) async {
-    emit(const SubjectLoading());
-    final result = await createSubjectUsecase(
+    emitLoading(emit);
+
+    final result = await createSubject(
       CreateSubjectParams(subject: event.subject),
     );
+
     result.fold(
-      (failure) => emit(SubjectError(failure.message)),
-      (subject) => emit(SubjectCreated(subject)),
+      (failure) => emitFailure(emit, failure),
+      (_) => add(LoadSubjectsEvent(event.subject.userId)),
     );
   }
 
-  // Update subject
   Future<void> _onUpdateSubject(
     UpdateSubjectEvent event,
-    Emitter<SubjectState> emit,
+    Emitter<BaseState<List<Subject>>> emit,
   ) async {
-    emit(const SubjectLoading());
-    final result = await updateSubjectUsecase(
+    emitLoading(emit);
+
+    final result = await updateSubject(
       UpdateSubjectParams(subject: event.subject),
     );
+
     result.fold(
-      (failure) => emit(SubjectError(failure.message)),
-      (subject) => emit(SubjectUpdated(subject)),
+      (failure) => emitFailure(emit, failure),
+      (_) => add(LoadSubjectsEvent(event.subject.userId)),
     );
   }
 
-  // Delete subject
   Future<void> _onDeleteSubject(
     DeleteSubjectEvent event,
-    Emitter<SubjectState> emit,
+    Emitter<BaseState<List<Subject>>> emit,
   ) async {
-    final result = await deleteSubjectUsecase(
-      DeleteSubjectParams(id: event.id),
+    emitLoading(emit);
+
+    final result = await deleteSubject(
+      DeleteSubjectParams(id: event.subjectId),
     );
-    result.fold(
-      (failure) => emit(SubjectError(failure.message)),
-      (_) => emit(SubjectDeleted(event.id)),
-    );
+
+    result.fold((failure) => emitFailure(emit, failure), (_) {
+      final current = state.viewState;
+      if (current is ViewSuccess<List<Subject>>) {
+        emitSuccess(
+          emit,
+          current.data.where((s) => s.id != event.subjectId).toList(),
+        );
+      }
+    });
   }
 }

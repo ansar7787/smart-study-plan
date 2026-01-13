@@ -1,18 +1,18 @@
 import 'package:dartz/dartz.dart';
+import 'package:smart_study_plan/features/admin_panel/domain/entities/admin_stats.dart';
 import 'package:smart_study_plan/features/user_management/domain/entities/user.dart';
-import '../../domain/entities/admin_stats.dart';
 import '../../../../core/error/failures.dart';
 
 abstract class AdminRepository {
-  // User Management
+  // User management
   Future<Either<Failure, List<User>>> getAllUsers();
-  Future<Either<Failure, List<User>>> getUsersByRole(String role);
+  Future<Either<Failure, List<User>>> getUsersByRole(UserRole role);
   Future<Either<Failure, void>> deleteUser(String userId);
-  Future<Either<Failure, void>> updateUserRole(String userId, String newRole);
+  Future<Either<Failure, void>> updateUserRole(String userId, UserRole newRole);
 
-  // Statistics
+  // Stats
   Future<Either<Failure, AdminStats>> getAdminStats();
 
-  // Search & Filter
+  // Search
   Future<Either<Failure, List<User>>> searchUsers(String query);
 }

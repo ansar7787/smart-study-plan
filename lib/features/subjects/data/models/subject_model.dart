@@ -3,7 +3,7 @@ import 'package:smart_study_plan/features/subjects/domain/entities/subject.dart'
 
 part 'subject_model.g.dart'; // Run: flutter pub run build_runner build
 
-@HiveType(typeId: 3) // typeId must be unique
+@HiveType(typeId: 0) // typeId must be unique
 class SubjectModel extends HiveObject {
   @HiveField(0)
   final String id;

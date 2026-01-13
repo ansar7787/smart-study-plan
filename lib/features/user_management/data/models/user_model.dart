@@ -19,52 +19,47 @@ class UserModel {
     required this.updatedAt,
   });
 
-  // JSON → Model (for Firebase / Hive maps)
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
-      id: json['id'] as String,
-      email: json['email'] as String,
-      name: json['name'] as String,
-      role: json['role'] as String,
-      photoUrl: json['photoUrl'] as String?,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      id: json['id'],
+      email: json['email'],
+      name: json['name'],
+      role: json['role'] ?? 'student',
+      photoUrl: json['photoUrl'],
+      createdAt: DateTime.parse(json['createdAt']),
+      updatedAt: DateTime.parse(json['updatedAt']),
     );
   }
 
-  // Model → JSON
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'email': email,
-      'name': name,
-      'role': role,
-      'photoUrl': photoUrl,
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
-    };
-  }
-
-  // Domain entity → Model
+  /// ✅ REQUIRED METHOD
   factory UserModel.fromEntity(User user) {
     return UserModel(
       id: user.id,
       email: user.email,
       name: user.name,
-      role: user.role,
+      role: user.role.value,
       photoUrl: user.photoUrl,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     );
   }
 
-  // Model → Domain entity
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'email': email,
+    'name': name,
+    'role': role,
+    'photoUrl': photoUrl,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+  };
+
   User toEntity() {
     return User(
       id: id,
       email: email,
       name: name,
-      role: role,
+      role: UserRoleX.fromString(role),
       photoUrl: photoUrl,
       createdAt: createdAt,
       updatedAt: updatedAt,

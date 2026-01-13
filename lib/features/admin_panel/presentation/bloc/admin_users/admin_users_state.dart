@@ -2,6 +2,7 @@ part of 'admin_users_bloc.dart';
 
 abstract class AdminUsersState extends Equatable {
   const AdminUsersState();
+
   @override
   List<Object?> get props => [];
 }
@@ -16,6 +17,7 @@ class UsersLoading extends AdminUsersState {
 
 class UsersLoaded extends AdminUsersState {
   final List<User> users;
+
   const UsersLoaded(this.users);
 
   @override
@@ -24,6 +26,7 @@ class UsersLoaded extends AdminUsersState {
 
 class UsersError extends AdminUsersState {
   final String message;
+
   const UsersError(this.message);
 
   @override

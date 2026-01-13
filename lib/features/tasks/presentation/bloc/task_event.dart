@@ -1,13 +1,10 @@
-part of 'task_bloc.dart';
+import '../../domain/entities/task.dart';
+import 'package:smart_study_plan/core/bloc/base_event.dart';
 
-abstract class TaskEvent extends Equatable {
+abstract class TaskEvent extends BaseEvent {
   const TaskEvent();
-
-  @override
-  List<Object?> get props => [];
 }
 
-// Load tasks by subject
 class LoadTasksBySubjectEvent extends TaskEvent {
   final String subjectId;
   const LoadTasksBySubjectEvent(this.subjectId);
@@ -16,16 +13,6 @@ class LoadTasksBySubjectEvent extends TaskEvent {
   List<Object?> get props => [subjectId];
 }
 
-// Load tasks by user
-class LoadTasksByUserEvent extends TaskEvent {
-  final String userId;
-  const LoadTasksByUserEvent(this.userId);
-
-  @override
-  List<Object?> get props => [userId];
-}
-
-// Create task
 class CreateTaskEvent extends TaskEvent {
   final Task task;
   const CreateTaskEvent(this.task);
@@ -34,7 +21,6 @@ class CreateTaskEvent extends TaskEvent {
   List<Object?> get props => [task];
 }
 
-// Update task
 class UpdateTaskEvent extends TaskEvent {
   final Task task;
   const UpdateTaskEvent(this.task);
@@ -43,7 +29,6 @@ class UpdateTaskEvent extends TaskEvent {
   List<Object?> get props => [task];
 }
 
-// Toggle task completion
 class ToggleTaskEvent extends TaskEvent {
   final Task task;
   const ToggleTaskEvent(this.task);
@@ -52,11 +37,12 @@ class ToggleTaskEvent extends TaskEvent {
   List<Object?> get props => [task];
 }
 
-// Delete task
 class DeleteTaskEvent extends TaskEvent {
   final String id;
-  const DeleteTaskEvent(this.id);
+  final String subjectId;
+
+  const DeleteTaskEvent({required this.id, required this.subjectId});
 
   @override
-  List<Object?> get props => [id];
+  List<Object?> get props => [id, subjectId];
 }

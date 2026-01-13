@@ -8,7 +8,7 @@ part of 'task_model.dart';
 
 class TaskModelAdapter extends TypeAdapter<TaskModel> {
   @override
-  final int typeId = 4;
+  final int typeId = 1;
 
   @override
   TaskModel read(BinaryReader reader) {
@@ -18,41 +18,50 @@ class TaskModelAdapter extends TypeAdapter<TaskModel> {
     };
     return TaskModel(
       id: fields[0] as String,
-      title: fields[1] as String,
-      description: fields[2] as String?,
-      subjectId: fields[3] as String,
-      dueDate: fields[4] as DateTime,
-      isCompleted: fields[5] as bool,
+      subjectId: fields[1] as String,
+      userId: fields[2] as String,
+      title: fields[3] as String,
+      description: fields[4] as String,
+      tags: (fields[5] as List).cast<String>(),
       priority: fields[6] as int,
-      userId: fields[7] as String,
-      createdAt: fields[8] as DateTime,
-      updatedAt: fields[9] as DateTime,
+      status: fields[7] as String,
+      dueDate: fields[8] as DateTime,
+      estimatedTime: fields[9] as DateTime?,
+      isCompleted: fields[10] as bool,
+      createdAt: fields[11] as DateTime,
+      updatedAt: fields[12] as DateTime,
     );
   }
 
   @override
   void write(BinaryWriter writer, TaskModel obj) {
     writer
-      ..writeByte(10)
+      ..writeByte(13)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
-      ..write(obj.title)
-      ..writeByte(2)
-      ..write(obj.description)
-      ..writeByte(3)
       ..write(obj.subjectId)
+      ..writeByte(2)
+      ..write(obj.userId)
+      ..writeByte(3)
+      ..write(obj.title)
       ..writeByte(4)
-      ..write(obj.dueDate)
+      ..write(obj.description)
       ..writeByte(5)
-      ..write(obj.isCompleted)
+      ..write(obj.tags)
       ..writeByte(6)
       ..write(obj.priority)
       ..writeByte(7)
-      ..write(obj.userId)
+      ..write(obj.status)
       ..writeByte(8)
-      ..write(obj.createdAt)
+      ..write(obj.dueDate)
       ..writeByte(9)
+      ..write(obj.estimatedTime)
+      ..writeByte(10)
+      ..write(obj.isCompleted)
+      ..writeByte(11)
+      ..write(obj.createdAt)
+      ..writeByte(12)
       ..write(obj.updatedAt);
   }
 

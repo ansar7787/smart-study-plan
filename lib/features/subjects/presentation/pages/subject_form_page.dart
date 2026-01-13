@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
+
+import 'package:smart_study_plan/core/bloc/base_state.dart';
+import 'package:smart_study_plan/core/bloc/view_state.dart';
+
 import '../../domain/entities/subject.dart';
 import '../bloc/subject_bloc.dart';
+import '../bloc/subject_event.dart';
 
 class SubjectFormPage extends StatefulWidget {
   final Subject? subject;
@@ -10,84 +15,78 @@ class SubjectFormPage extends StatefulWidget {
 
   const SubjectFormPage({super.key, this.subject, required this.userId});
 
+  bool get isEdit => subject != null;
+
   @override
   State<SubjectFormPage> createState() => _SubjectFormPageState();
 }
 
 class _SubjectFormPageState extends State<SubjectFormPage> {
-  late TextEditingController _nameController;
-  late TextEditingController _descriptionController;
-  late TextEditingController _teacherController;
-  late TextEditingController _creditsController;
-  late TextEditingController _semesterController;
-  Color _selectedColor = const Color(0xFF2196F3);
+  final _formKey = GlobalKey<FormState>();
+
+  late final TextEditingController _name;
+  late final TextEditingController _description;
+  late final TextEditingController _teacher;
+  late final TextEditingController _credits;
+  late final TextEditingController _semester;
+
+  Color _color = const Color(0xFF4F46E5);
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.subject?.name ?? '');
-    _descriptionController = TextEditingController(
-      text: widget.subject?.description ?? '',
-    );
-    _teacherController = TextEditingController(
-      text: widget.subject?.teacher ?? '',
-    );
-    _creditsController = TextEditingController(
-      text: widget.subject?.credits.toString() ?? '0',
-    );
-    _semesterController = TextEditingController(
-      text: widget.subject?.semester ?? '',
-    );
-    if (widget.subject != null) {
-      _selectedColor = Color(
-        int.parse(
-          'FF${widget.subject!.color.replaceFirst('#', '')}',
-          radix: 16,
-        ),
+    final s = widget.subject;
+
+    _name = TextEditingController(text: s?.name ?? '');
+    _description = TextEditingController(text: s?.description ?? '');
+    _teacher = TextEditingController(text: s?.teacher ?? '');
+    _credits = TextEditingController(text: s?.credits.toString() ?? '0');
+    _semester = TextEditingController(text: s?.semester ?? '');
+
+    if (s != null) {
+      _color = Color(
+        int.parse('FF${s.color.replaceFirst('#', '')}', radix: 16),
       );
     }
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _descriptionController.dispose();
-    _teacherController.dispose();
-    _creditsController.dispose();
-    _semesterController.dispose();
+    _name.dispose();
+    _description.dispose();
+    _teacher.dispose();
+    _credits.dispose();
+    _semester.dispose();
     super.dispose();
   }
 
-  void _saveSubject() {
-    if (_nameController.text.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Subject name is required')));
-      return;
-    }
+  void _save() {
+    if (!_formKey.currentState!.validate()) return;
+
+    final now = DateTime.now();
 
     final subject = Subject(
       id: widget.subject?.id ?? const Uuid().v4(),
-      name: _nameController.text,
-      description: _descriptionController.text.isEmpty
-          ? null
-          : _descriptionController.text,
-      color:
-          '#${_selectedColor.toARGB32().toRadixString(16).substring(2).toUpperCase()}',
-      teacher: _teacherController.text.isEmpty ? null : _teacherController.text,
-      credits: int.tryParse(_creditsController.text) ?? 0,
-      semester: _semesterController.text.isEmpty
-          ? null
-          : _semesterController.text,
       userId: widget.userId,
-      createdAt: widget.subject?.createdAt ?? DateTime.now(),
-      updatedAt: DateTime.now(),
+      name: _name.text.trim(),
+      description: _description.text.trim().isEmpty
+          ? null
+          : _description.text.trim(),
+      teacher: _teacher.text.trim().isEmpty ? null : _teacher.text.trim(),
+      semester: _semester.text.trim().isEmpty ? null : _semester.text.trim(),
+      credits: int.parse(_credits.text.trim()),
+      color:
+          '#${_color.toARGB32().toRadixString(16).substring(2).toUpperCase()}',
+      createdAt: widget.subject?.createdAt ?? now,
+      updatedAt: now,
     );
 
-    if (widget.subject == null) {
-      context.read<SubjectBloc>().add(CreateSubjectEvent(subject));
+    final bloc = context.read<SubjectBloc>();
+
+    if (widget.isEdit) {
+      bloc.add(UpdateSubjectEvent(subject));
     } else {
-      context.read<SubjectBloc>().add(UpdateSubjectEvent(subject));
+      bloc.add(CreateSubjectEvent(subject));
     }
   }
 
@@ -95,176 +94,210 @@ class _SubjectFormPageState extends State<SubjectFormPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.subject == null ? 'Add Subject' : 'Edit Subject'),
+        title: Text(widget.isEdit ? 'Edit Subject' : 'New Subject'),
       ),
-      body: BlocListener<SubjectBloc, SubjectState>(
+      body: BlocListener<SubjectBloc, BaseState<List<Subject>>>(
         listener: (context, state) {
-          if (state is SubjectCreated || state is SubjectUpdated) {
+          final viewState = state.viewState;
+          if (viewState is ViewSuccess<List<Subject>>) {
             Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  state is SubjectCreated
-                      ? 'Subject created'
-                      : 'Subject updated',
-                ),
-              ),
-            );
-          } else if (state is SubjectError) {
+          }
+          if (viewState is ViewFailure<List<Subject>>) {
             ScaffoldMessenger.of(
               context,
-            ).showSnackBar(SnackBar(content: Text('Error: ${state.message}')));
+            ).showSnackBar(SnackBar(content: Text(viewState.message)));
           }
         },
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
             children: [
-              // Name
-              TextField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: 'Subject Name *',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Description
-              TextField(
-                controller: _descriptionController,
-                decoration: InputDecoration(
-                  labelText: 'Description',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-              // Teacher
-              TextField(
-                controller: _teacherController,
-                decoration: InputDecoration(
-                  labelText: 'Teacher',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Credits
-              TextField(
-                controller: _creditsController,
-                decoration: InputDecoration(
-                  labelText: 'Credits',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 16),
-              // Semester
-              TextField(
-                controller: _semesterController,
-                decoration: InputDecoration(
-                  labelText: 'Semester',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Color picker
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Color'),
-                  GestureDetector(
-                    onTap: () {
-                      _showColorPicker();
-                    },
-                    child: Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: _selectedColor,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey),
-                      ),
+              _SectionCard(
+                child: Column(
+                  children: [
+                    _Field(
+                      controller: _name,
+                      label: 'Subject name',
+                      validator: (v) =>
+                          v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 12),
+                    _Field(
+                      controller: _description,
+                      label: 'Description',
+                      maxLines: 3,
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 24),
-              // Save button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _saveSubject,
-                  child: const Text('Save Subject'),
+              const SizedBox(height: 16),
+
+              _SectionCard(
+                child: Column(
+                  children: [
+                    _Field(controller: _teacher, label: 'Teacher'),
+                    const SizedBox(height: 12),
+                    _Field(
+                      controller: _credits,
+                      label: 'Credits',
+                      keyboardType: TextInputType.number,
+                      validator: (v) => int.tryParse(v ?? '') == null
+                          ? 'Invalid number'
+                          : null,
+                    ),
+                    const SizedBox(height: 12),
+                    _Field(controller: _semester, label: 'Semester'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              _SectionCard(
+                child: _ColorPicker(
+                  selected: _color,
+                  onSelect: (c) => setState(() => _color = c),
                 ),
               ),
             ],
           ),
         ),
       ),
+
+      /// 🔥 FIXED SAVE BUTTON
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.all(16),
+        child: SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            onPressed: _save,
+            child: Text(widget.isEdit ? 'Update Subject' : 'Create Subject'),
+          ),
+        ),
+      ),
     );
   }
+}
 
-  void _showColorPicker() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Select Color'),
-          content: GridView.count(
-            crossAxisCount: 5,
-            children:
-                [
-                      Colors.red,
-                      Colors.pink,
-                      Colors.purple,
-                      Colors.deepPurple,
-                      Colors.indigo,
-                      Colors.blue,
-                      Colors.lightBlue,
-                      Colors.cyan,
-                      Colors.teal,
-                      Colors.green,
-                      Colors.lightGreen,
-                      Colors.lime,
-                      Colors.yellow,
-                      Colors.amber,
-                      Colors.orange,
-                      Colors.deepOrange,
-                      Colors.brown,
-                      Colors.grey,
-                      Colors.blueGrey,
-                    ]
-                    .map(
-                      (color) => GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedColor = color;
-                          });
-                          Navigator.pop(context);
-                        },
-                        child: Container(
-                          margin: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: color,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                    )
-                    .toList(),
-          ),
-        );
-      },
+/* -------------------------------------------------------------------------- */
+/*                               UI HELPERS                                   */
+/* -------------------------------------------------------------------------- */
+
+class _SectionCard extends StatelessWidget {
+  final Widget child;
+
+  const _SectionCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.4)),
+      ),
+      child: child,
+    );
+  }
+}
+
+/* ------------------------------- TEXT FIELD -------------------------------- */
+
+class _Field extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final int maxLines;
+  final TextInputType keyboardType;
+  final String? Function(String?)? validator;
+
+  const _Field({
+    required this.controller,
+    required this.label,
+    this.maxLines = 1,
+    this.keyboardType = TextInputType.text,
+    this.validator,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines,
+      keyboardType: keyboardType,
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+}
+
+/* ------------------------------ COLOR PICKER ------------------------------- */
+
+class _ColorPicker extends StatelessWidget {
+  final Color selected;
+  final ValueChanged<Color> onSelect;
+
+  const _ColorPicker({required this.selected, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = [
+      const Color(0xFF4F46E5), // Indigo
+      const Color(0xFF0EA5E9), // Sky
+      const Color(0xFF10B981), // Emerald
+      const Color(0xFFF59E0B), // Amber
+      const Color(0xFFEF4444), // Red
+      const Color(0xFF8B5CF6), // Violet
+      const Color(0xFF14B8A6), // Teal
+      const Color(0xFF64748B), // Slate
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Subject Color',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: colors.map((c) {
+            final isSelected = c.toARGB32() == selected.toARGB32();
+
+            return GestureDetector(
+              onTap: () => onSelect(c),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: c,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected ? Colors.black : Colors.transparent,
+                    width: 2,
+                  ),
+                ),
+                child: isSelected
+                    ? const Icon(Icons.check, size: 18, color: Colors.white)
+                    : null,
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 }

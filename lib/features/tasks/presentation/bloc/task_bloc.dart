@@ -1,15 +1,18 @@
-import 'package:bloc/bloc.dart';
-import 'package:equatable/equatable.dart';
-import 'package:smart_study_plan/features/tasks/domain/entities/task.dart';
-import 'package:smart_study_plan/features/tasks/domain/usecases/create_task.dart';
-import 'package:smart_study_plan/features/tasks/domain/usecases/delete_task.dart';
-import 'package:smart_study_plan/features/tasks/domain/usecases/get_tasks_by_subject.dart';
-import 'package:smart_study_plan/features/tasks/domain/usecases/update_task.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-part 'task_event.dart';
-part 'task_state.dart';
+import 'package:smart_study_plan/core/bloc/base_bloc.dart';
+import 'package:smart_study_plan/core/bloc/base_state.dart';
+import 'package:smart_study_plan/core/bloc/view_state.dart';
 
-class TaskBloc extends Bloc<TaskEvent, TaskState> {
+import '../../domain/entities/task.dart';
+import '../../domain/usecases/create_task.dart';
+import '../../domain/usecases/update_task.dart';
+import '../../domain/usecases/delete_task.dart';
+import '../../domain/usecases/get_tasks_by_subject.dart';
+
+import 'task_event.dart';
+
+class TaskBloc extends BaseBloc<TaskEvent, List<Task>> {
   final GetTasksBySubjectUsecase getTasksBySubjectUsecase;
   final CreateTaskUsecase createTaskUsecase;
   final UpdateTaskUsecase updateTaskUsecase;
@@ -20,79 +23,97 @@ class TaskBloc extends Bloc<TaskEvent, TaskState> {
     required this.createTaskUsecase,
     required this.updateTaskUsecase,
     required this.deleteTaskUsecase,
-  }) : super(const TaskInitial()) {
-    on<LoadTasksBySubjectEvent>(_onLoadTasksBySubject);
+  }) : super(BaseState.initial()) {
+    on<LoadTasksBySubjectEvent>(_onLoadTasks);
     on<CreateTaskEvent>(_onCreateTask);
     on<UpdateTaskEvent>(_onUpdateTask);
     on<ToggleTaskEvent>(_onToggleTask);
     on<DeleteTaskEvent>(_onDeleteTask);
   }
 
-  // Load tasks by subject
-  Future<void> _onLoadTasksBySubject(
+  // ---------------- HELPERS ----------------
+
+  List<Task> _currentTasks() {
+    final viewState = state.viewState;
+    if (viewState is ViewSuccess<List<Task>>) {
+      return viewState.data;
+    }
+    return [];
+  }
+
+  // ---------------- LOAD ----------------
+
+  Future<void> _onLoadTasks(
     LoadTasksBySubjectEvent event,
-    Emitter<TaskState> emit,
+    Emitter<BaseState<List<Task>>> emit,
   ) async {
-    emit(const TaskLoading());
+    emitLoading(emit);
+
     final result = await getTasksBySubjectUsecase(
       GetTasksParams(subjectId: event.subjectId),
     );
+
     result.fold(
-      (failure) => emit(TaskError(failure.message)),
-      (tasks) => emit(TaskListLoaded(tasks)),
+      (failure) => emitFailure(emit, failure),
+      (tasks) => emitSuccess(emit, tasks),
     );
   }
 
-  // Create task
+  // ---------------- CREATE ----------------
+
   Future<void> _onCreateTask(
     CreateTaskEvent event,
-    Emitter<TaskState> emit,
+    Emitter<BaseState<List<Task>>> emit,
   ) async {
-    emit(const TaskLoading());
     final result = await createTaskUsecase(CreateTaskParams(task: event.task));
-    result.fold(
-      (failure) => emit(TaskError(failure.message)),
-      (task) => emit(TaskCreated(task)),
-    );
+
+    result.fold((failure) => emitFailure(emit, failure), (_) {
+      add(LoadTasksBySubjectEvent(event.task.subjectId));
+    });
   }
 
-  // Update task
+  // ---------------- UPDATE ----------------
+
   Future<void> _onUpdateTask(
     UpdateTaskEvent event,
-    Emitter<TaskState> emit,
+    Emitter<BaseState<List<Task>>> emit,
   ) async {
-    emit(const TaskLoading());
     final result = await updateTaskUsecase(UpdateTaskParams(task: event.task));
+
     result.fold(
-      (failure) => emit(TaskError(failure.message)),
-      (task) => emit(TaskUpdated(task)),
+      (failure) => emitFailure(emit, failure),
+      (_) => add(LoadTasksBySubjectEvent(event.task.subjectId)),
     );
   }
 
-  // Toggle task completion
+  // ---------------- TOGGLE (FIXED) ----------------
+
   Future<void> _onToggleTask(
     ToggleTaskEvent event,
-    Emitter<TaskState> emit,
+    Emitter<BaseState<List<Task>>> emit,
   ) async {
-    final updatedTask = event.task.copyWith(
-      isCompleted: !event.task.isCompleted,
+    final updated = event.task.copyWith(isCompleted: !event.task.isCompleted);
+
+    final tasks = _currentTasks();
+
+    emitSuccess(
+      emit,
+      tasks.map((t) => t.id == updated.id ? updated : t).toList(),
     );
-    final result = await updateTaskUsecase(UpdateTaskParams(task: updatedTask));
-    result.fold(
-      (failure) => emit(TaskError(failure.message)),
-      (task) => emit(TaskUpdated(task)),
-    );
+
+    await updateTaskUsecase(UpdateTaskParams(task: updated));
   }
 
-  // Delete task
+  // ---------------- DELETE (FIXED) ----------------
+
   Future<void> _onDeleteTask(
     DeleteTaskEvent event,
-    Emitter<TaskState> emit,
+    Emitter<BaseState<List<Task>>> emit,
   ) async {
-    final result = await deleteTaskUsecase(DeleteTaskParams(id: event.id));
-    result.fold(
-      (failure) => emit(TaskError(failure.message)),
-      (_) => emit(TaskDeleted(event.id)),
-    );
+    final tasks = _currentTasks();
+
+    emitSuccess(emit, tasks.where((t) => t.id != event.id).toList());
+
+    await deleteTaskUsecase(DeleteTaskParams(id: event.id));
   }
 }

@@ -10,8 +10,8 @@ import '../datasources/task_remote_datasource.dart';
 import '../models/task_model.dart';
 
 class TaskRepositoryImpl implements TaskRepository {
-  final TaskRemoteDatasource remoteDatasource;
-  final TaskLocalDatasource localDatasource;
+  final TaskRemoteDataSource remoteDatasource;
+  final TaskLocalDataSource localDatasource;
   final NetworkInfo networkInfo;
 
   TaskRepositoryImpl({
@@ -25,9 +25,9 @@ class TaskRepositoryImpl implements TaskRepository {
     try {
       if (await networkInfo.isConnected) {
         final model = TaskModel.fromEntity(task);
-        final result = await remoteDatasource.createTask(model);
-        await localDatasource.cacheTask(result);
-        return Right(result.toEntity());
+        await remoteDatasource.createTask(model);
+        await localDatasource.cacheTask(model);
+        return Right(model.toEntity());
       } else {
         return Left(NetworkFailure('No internet connection'));
       }
@@ -42,9 +42,9 @@ class TaskRepositoryImpl implements TaskRepository {
   Future<Either<Failure, Task>> getTask(String id) async {
     try {
       if (await networkInfo.isConnected) {
-        final result = await remoteDatasource.getTask(id);
-        await localDatasource.cacheTask(result);
-        return Right(result.toEntity());
+        final model = await remoteDatasource.getTask(id);
+        await localDatasource.cacheTask(model);
+        return Right(model.toEntity());
       } else {
         return Left(NetworkFailure('No internet connection'));
       }
@@ -62,11 +62,14 @@ class TaskRepositoryImpl implements TaskRepository {
     try {
       if (await networkInfo.isConnected) {
         final result = await remoteDatasource.getTasksBySubject(subjectId);
-        await localDatasource.cacheTasks(result);
-        return Right(result.map((model) => model.toEntity()).toList());
+        // no bulk cache API; optionally cache individually
+        for (final model in result) {
+          await localDatasource.cacheTask(model);
+        }
+        return Right(result.map((m) => m.toEntity()).toList());
       } else {
         final cached = await localDatasource.getCachedTasksBySubject(subjectId);
-        return Right(cached.map((model) => model.toEntity()).toList());
+        return Right(cached.map((m) => m.toEntity()).toList());
       }
     } on CacheException catch (e) {
       return Left(CacheFailure(e.message));
@@ -82,11 +85,13 @@ class TaskRepositoryImpl implements TaskRepository {
     try {
       if (await networkInfo.isConnected) {
         final result = await remoteDatasource.getTasksByUser(userId);
-        await localDatasource.cacheTasks(result);
-        return Right(result.map((model) => model.toEntity()).toList());
+        for (final model in result) {
+          await localDatasource.cacheTask(model);
+        }
+        return Right(result.map((m) => m.toEntity()).toList());
       } else {
-        final cached = await localDatasource.getCachedTasksByUser(userId);
-        return Right(cached.map((model) => model.toEntity()).toList());
+        // no user-specific cache API; fall back to empty or subject-based logic
+        return Right(<Task>[]);
       }
     } on CacheException catch (e) {
       return Left(CacheFailure(e.message));
@@ -102,11 +107,13 @@ class TaskRepositoryImpl implements TaskRepository {
     try {
       if (await networkInfo.isConnected) {
         final result = await remoteDatasource.getAllTasks();
-        await localDatasource.cacheTasks(result);
-        return Right(result.map((model) => model.toEntity()).toList());
+        for (final model in result) {
+          await localDatasource.cacheTask(model);
+        }
+        return Right(result.map((m) => m.toEntity()).toList());
       } else {
-        final cached = await localDatasource.getAllCachedTasks();
-        return Right(cached.map((model) => model.toEntity()).toList());
+        // no all-cached API; use clearTaskCache or subject-based cache if needed
+        return Right(<Task>[]);
       }
     } on CacheException catch (e) {
       return Left(CacheFailure(e.message));
@@ -122,9 +129,9 @@ class TaskRepositoryImpl implements TaskRepository {
     try {
       if (await networkInfo.isConnected) {
         final model = TaskModel.fromEntity(task);
-        final result = await remoteDatasource.updateTask(model);
-        await localDatasource.cacheTask(result);
-        return Right(result.toEntity());
+        await remoteDatasource.updateTask(model);
+        await localDatasource.cacheTask(model);
+        return Right(model.toEntity());
       } else {
         return Left(NetworkFailure('No internet connection'));
       }
@@ -140,6 +147,7 @@ class TaskRepositoryImpl implements TaskRepository {
     try {
       if (await networkInfo.isConnected) {
         await remoteDatasource.deleteTask(id);
+        await localDatasource.deleteCachedTask(id);
         return const Right(null);
       } else {
         return Left(NetworkFailure('No internet connection'));

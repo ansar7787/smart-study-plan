@@ -13,34 +13,34 @@ class AdminDashboardBloc
   final GetAdminStatsUseCase getAdminStatsUseCase;
 
   AdminDashboardBloc({required this.getAdminStatsUseCase})
-    : super(const DashboardInitial()) {
-    on<LoadDashboardEvent>(_onLoadDashboard);
-    on<RefreshDashboardEvent>(_onRefreshDashboard);
+    : super(const AdminDashboardInitial()) {
+    on<LoadAdminDashboardEvent>(_onLoadDashboard);
+    on<RefreshAdminDashboardEvent>(_onRefreshDashboard);
   }
 
   Future<void> _onLoadDashboard(
-    LoadDashboardEvent event,
+    LoadAdminDashboardEvent event,
     Emitter<AdminDashboardState> emit,
   ) async {
-    emit(const DashboardLoading());
+    emit(const AdminDashboardLoading());
 
     final result = await getAdminStatsUseCase(const NoParams());
+
     result.fold(
       (failure) {
-        AppLogger.e('Failed to load dashboard: ${failure.message}');
-        emit(DashboardError(failure.message));
+        AppLogger.e('Admin dashboard load failed: ${failure.message}');
+        emit(AdminDashboardError(failure.message));
       },
       (stats) {
-        AppLogger.d('Dashboard stats loaded');
-        emit(DashboardLoaded(stats));
+        emit(AdminDashboardLoaded(stats));
       },
     );
   }
 
   Future<void> _onRefreshDashboard(
-    RefreshDashboardEvent event,
+    RefreshAdminDashboardEvent event,
     Emitter<AdminDashboardState> emit,
   ) async {
-    add(const LoadDashboardEvent());
+    add(const LoadAdminDashboardEvent());
   }
 }

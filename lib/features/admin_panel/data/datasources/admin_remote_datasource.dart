@@ -1,62 +1,73 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:smart_study_plan/core/error/exceptions.dart';
-import '../models/admin_stats_model.dart';
-import '../models/user_admin_model.dart';
+import '../../../../core/error/exceptions.dart';
 import '../../../../core/utils/logger.dart';
 
+import '../models/admin_stats_model.dart';
+import '../models/user_admin_model.dart';
+
 abstract class AdminRemoteDatasource {
+  // USERS
   Future<List<UserAdminModel>> getAllUsers();
   Future<List<UserAdminModel>> getUsersByRole(String role);
+
   Future<void> deleteUser(String userId);
   Future<void> updateUserRole(String userId, String newRole);
+
+  // STATS
   Future<AdminStatsModel> getAdminStats();
+
+  // SEARCH
   Future<List<UserAdminModel>> searchUsers(String query);
 }
 
 class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
-  final FirebaseFirestore _firestore;
+  final FirebaseFirestore firestore;
 
-  AdminRemoteDatasourceImpl(this._firestore);
+  AdminRemoteDatasourceImpl(this.firestore);
+
+  // ------------------------------------------------------------
+  // USERS
+  // ------------------------------------------------------------
 
   @override
   Future<List<UserAdminModel>> getAllUsers() async {
     try {
-      final snapshot = await _firestore.collection('users').get();
+      final snapshot = await firestore.collection('users').get();
 
-      final users = snapshot.docs.map((doc) {
-        return UserAdminModel.fromJson(doc.data());
-      }).toList();
+      final users = snapshot.docs
+          .map((doc) => UserAdminModel.fromJson(doc.data()))
+          .toList();
 
-      AppLogger.d('Fetched ${users.length} users');
+      AppLogger.d('Fetched ${users.length} users from Firestore');
       return users;
     } catch (e) {
-      throw AuthFirebaseException('Failed to get all users: $e');
+      throw AuthFirebaseException('Failed to fetch users: $e');
     }
   }
 
   @override
   Future<List<UserAdminModel>> getUsersByRole(String role) async {
     try {
-      final snapshot = await _firestore
+      final snapshot = await firestore
           .collection('users')
           .where('role', isEqualTo: role)
           .get();
 
-      final users = snapshot.docs.map((doc) {
-        return UserAdminModel.fromJson(doc.data());
-      }).toList();
+      final users = snapshot.docs
+          .map((doc) => UserAdminModel.fromJson(doc.data()))
+          .toList();
 
-      AppLogger.d('Fetched ${users.length} $role users');
+      AppLogger.d('Fetched ${users.length} users with role=$role');
       return users;
     } catch (e) {
-      throw AuthFirebaseException('Failed to get users by role: $e');
+      throw AuthFirebaseException('Failed to fetch users by role: $e');
     }
   }
 
   @override
   Future<void> deleteUser(String userId) async {
     try {
-      await _firestore.collection('users').doc(userId).delete();
+      await firestore.collection('users').doc(userId).delete();
       AppLogger.d('User deleted: $userId');
     } catch (e) {
       throw AuthFirebaseException('Failed to delete user: $e');
@@ -66,46 +77,53 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
   @override
   Future<void> updateUserRole(String userId, String newRole) async {
     try {
-      await _firestore.collection('users').doc(userId).update({
+      await firestore.collection('users').doc(userId).update({
         'role': newRole,
         'updatedAt': DateTime.now().toIso8601String(),
       });
-      AppLogger.d('User role updated: $userId -> $newRole');
+      AppLogger.d('User role updated: $userId → $newRole');
     } catch (e) {
       throw AuthFirebaseException('Failed to update user role: $e');
     }
   }
 
+  // ------------------------------------------------------------
+  // STATS
+  // ------------------------------------------------------------
+
   @override
   Future<AdminStatsModel> getAdminStats() async {
     try {
-      final usersSnapshot = await _firestore.collection('users').get();
-      final users = usersSnapshot.docs;
+      final usersSnapshot = await firestore.collection('users').get();
 
       int students = 0;
       int admins = 0;
 
-      for (var doc in users) {
-        final role = doc.data()['role'] as String?;
+      for (final doc in usersSnapshot.docs) {
+        final role = doc.data()['role'];
         if (role == 'student') students++;
         if (role == 'admin') admins++;
       }
 
       final stats = AdminStatsModel(
-        totalUsers: users.length,
+        totalUsers: usersSnapshot.docs.length,
         totalStudents: students,
         totalAdmins: admins,
-        totalSubjects: 0, // Will update in Phase 3
-        totalTasks: 0, // Will update in Phase 3
+        totalSubjects: 0, // will be updated later
+        totalTasks: 0, // will be updated later
         lastUpdated: DateTime.now(),
       );
 
-      AppLogger.d('Admin stats: ${stats.totalUsers} total users');
+      AppLogger.d('Admin stats calculated');
       return stats;
     } catch (e) {
-      throw AuthFirebaseException('Failed to get admin stats: $e');
+      throw AuthFirebaseException('Failed to load admin stats: $e');
     }
   }
+
+  // ------------------------------------------------------------
+  // SEARCH
+  // ------------------------------------------------------------
 
   @override
   Future<List<UserAdminModel>> searchUsers(String query) async {
@@ -114,21 +132,21 @@ class AdminRemoteDatasourceImpl implements AdminRemoteDatasource {
         return getAllUsers();
       }
 
-      final snapshot = await _firestore.collection('users').get();
+      final snapshot = await firestore.collection('users').get();
 
-      final filteredUsers = snapshot.docs
-          .where((doc) {
-            final user = UserAdminModel.fromJson(doc.data());
-            return user.name.toLowerCase().contains(query.toLowerCase()) ||
-                user.email.toLowerCase().contains(query.toLowerCase());
-          })
+      final users = snapshot.docs
           .map((doc) => UserAdminModel.fromJson(doc.data()))
+          .where(
+            (u) =>
+                u.name.toLowerCase().contains(query.toLowerCase()) ||
+                u.email.toLowerCase().contains(query.toLowerCase()),
+          )
           .toList();
 
-      AppLogger.d('Search found ${filteredUsers.length} users for: $query');
-      return filteredUsers;
+      AppLogger.d('Search "$query" returned ${users.length} users');
+      return users;
     } catch (e) {
-      throw AuthFirebaseException('Failed to search users: $e');
+      throw AuthFirebaseException('User search failed: $e');
     }
   }
 }

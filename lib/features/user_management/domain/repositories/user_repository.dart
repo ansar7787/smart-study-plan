@@ -3,12 +3,15 @@ import '../entities/user.dart';
 import '../../../../core/error/failures.dart';
 
 abstract class UserRepository {
-  // Authentication
+  // -----------------------------
+  // AUTHENTICATION
+  // -----------------------------
+
+  /// Register user (role is ALWAYS student, enforced internally)
   Future<Either<Failure, User>> registerUser({
     required String email,
     required String password,
     required String name,
-    required String role,
   });
 
   Future<Either<Failure, User>> loginUser({
@@ -18,17 +21,28 @@ abstract class UserRepository {
 
   Future<Either<Failure, void>> logoutUser();
 
-  // User Management
-  Future<Either<Failure, User>> getUser(String userId);
+  Future<Either<Failure, void>> resetPassword(String email);
 
-  Future<Either<Failure, void>> updateUser(User user);
+  // -----------------------------
+  // AUTH STATE
+  // -----------------------------
 
-  Future<Either<Failure, void>> deleteUser(String userId);
-
-  // Check Authentication
   Future<Either<Failure, User?>> getCurrentUser();
 
   Future<bool> isUserLoggedIn();
 
-  Future<String?> getUserRole(String userId);
+  // -----------------------------
+  // USER MANAGEMENT
+  // -----------------------------
+
+  Future<Either<Failure, User>> getUser(String userId);
+
+  /// Update profile (name / photo only)
+  Future<Either<Failure, User>> updateUser(User user);
+
+  /// Delete local + remote user data
+  Future<Either<Failure, void>> deleteUser(String userId);
+
+  /// Read-only role access
+  Future<Either<Failure, String>> getUserRole(String userId);
 }

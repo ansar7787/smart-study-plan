@@ -2,29 +2,36 @@ part of 'admin_dashboard_bloc.dart';
 
 abstract class AdminDashboardState extends Equatable {
   const AdminDashboardState();
+
   @override
   List<Object?> get props => [];
 }
 
-class DashboardInitial extends AdminDashboardState {
-  const DashboardInitial();
+/// Initial state
+class AdminDashboardInitial extends AdminDashboardState {
+  const AdminDashboardInitial();
 }
 
-class DashboardLoading extends AdminDashboardState {
-  const DashboardLoading();
+/// Loading state
+class AdminDashboardLoading extends AdminDashboardState {
+  const AdminDashboardLoading();
 }
 
-class DashboardLoaded extends AdminDashboardState {
+/// Loaded successfully
+class AdminDashboardLoaded extends AdminDashboardState {
   final AdminStats stats;
-  const DashboardLoaded(this.stats);
+
+  const AdminDashboardLoaded(this.stats);
 
   @override
   List<Object?> get props => [stats];
 }
 
-class DashboardError extends AdminDashboardState {
+/// Error state
+class AdminDashboardError extends AdminDashboardState {
   final String message;
-  const DashboardError(this.message);
+
+  const AdminDashboardError(this.message);
 
   @override
   List<Object?> get props => [message];

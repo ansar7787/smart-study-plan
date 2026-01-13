@@ -7,6 +7,8 @@ import 'package:smart_study_plan/features/user_management/domain/usecases/get_cu
 import 'package:smart_study_plan/features/user_management/domain/usecases/login_user.dart';
 import 'package:smart_study_plan/features/user_management/domain/usecases/logout_user.dart';
 import 'package:smart_study_plan/features/user_management/domain/usecases/register_user.dart';
+import 'package:smart_study_plan/features/user_management/domain/usecases/reset_password.dart';
+import 'package:smart_study_plan/features/user_management/domain/usecases/update_user.dart';
 
 part 'user_event.dart';
 part 'user_state.dart';
@@ -16,12 +18,16 @@ class UserBloc extends Bloc<UserEvent, UserState> {
   final LoginUserUseCase loginUserUseCase;
   final GetCurrentUserUseCase getCurrentUserUseCase;
   final LogoutUserUseCase logoutUserUseCase;
+  final UpdateUserUseCase updateUserUseCase;
+  final ResetPasswordUseCase resetPasswordUseCase;
 
   UserBloc({
     required this.registerUserUseCase,
     required this.loginUserUseCase,
     required this.getCurrentUserUseCase,
     required this.logoutUserUseCase,
+    required this.updateUserUseCase,
+    required this.resetPasswordUseCase,
   }) : super(const UserInitial()) {
     on<RegisterUserEvent>(_onRegisterUser);
     on<LoginUserEvent>(_onLoginUser);
@@ -29,6 +35,7 @@ class UserBloc extends Bloc<UserEvent, UserState> {
     on<CheckAuthStatusEvent>(_onCheckAuthStatus);
     on<GetCurrentUserEvent>(_onGetCurrentUser);
     on<UpdateUserEvent>(_onUpdateUser);
+    on<ResetPasswordEvent>(_onResetPassword);
   }
 
   Future<void> _onRegisterUser(
@@ -42,19 +49,12 @@ class UserBloc extends Bloc<UserEvent, UserState> {
         email: event.email,
         password: event.password,
         name: event.name,
-        role: event.role,
       ),
     );
 
     result.fold(
-      (failure) {
-        AppLogger.e('Registration failed: ${failure.message}');
-        emit(UserError(failure.message));
-      },
-      (user) {
-        AppLogger.d('Registration successful: ${user.email}');
-        emit(UserAuthenticated(user));
-      },
+      (failure) => emit(UserError(failure.message)),
+      (user) => emit(UserRegisterSuccess(user)),
     );
   }
 
@@ -69,14 +69,8 @@ class UserBloc extends Bloc<UserEvent, UserState> {
     );
 
     result.fold(
-      (failure) {
-        AppLogger.e('Login failed: ${failure.message}');
-        emit(UserError(failure.message));
-      },
-      (user) {
-        AppLogger.d('Login successful: ${user.email}');
-        emit(UserAuthenticated(user));
-      },
+      (failure) => emit(UserError(failure.message)),
+      (user) => emit(UserLoginSuccess(user)),
     );
   }
 
@@ -158,19 +152,31 @@ class UserBloc extends Bloc<UserEvent, UserState> {
 
     emit(const UserLoading(message: 'Updating profile...'));
 
-    final updatedUser = User(
-      id: currentUser.id,
-      email: currentUser.email,
-      name: event.name ?? currentUser.name,
-      role: currentUser.role,
-      photoUrl: event.photoUrl ?? currentUser.photoUrl,
-      createdAt: currentUser.createdAt,
+    final updatedUser = currentUser.copyWith(
+      name: event.name,
+      photoUrl: event.photoUrl,
       updatedAt: DateTime.now(),
     );
 
-    // For now, just emit updated state
-    emit(
-      UserUpdated(user: updatedUser, message: 'Profile updated successfully'),
+    final result = await updateUserUseCase(updatedUser);
+
+    result.fold(
+      (failure) => emit(UserError(failure.message)),
+      (user) => emit(UserAuthenticated(user)),
+    );
+  }
+
+  Future<void> _onResetPassword(
+    ResetPasswordEvent event,
+    Emitter<UserState> emit,
+  ) async {
+    emit(const UserLoading(message: 'Sending reset link...'));
+
+    final result = await resetPasswordUseCase(event.email);
+
+    result.fold(
+      (f) => emit(UserError(f.message)),
+      (_) => emit(const UserLoggedOut()),
     );
   }
 }
