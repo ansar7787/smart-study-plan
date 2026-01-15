@@ -45,20 +45,20 @@ class GetCurrentUserEvent extends UserEvent {
 }
 
 class UpdateUserEvent extends UserEvent {
-  final String userId;
   final String? name;
   final String? photoUrl;
 
-  const UpdateUserEvent({required this.userId, this.name, this.photoUrl});
+  const UpdateUserEvent({this.name, this.photoUrl});
 
   @override
-  List<Object?> get props => [userId, name, photoUrl];
+  List<Object?> get props => [name, photoUrl];
 }
 
-class ResetPasswordEvent extends UserEvent {
-  final String email;
-  const ResetPasswordEvent(this.email);
+class UpdateUserAvatarEvent extends UserEvent {
+  final File file;
+
+  const UpdateUserAvatarEvent(this.file);
 
   @override
-  List<Object?> get props => [email];
+  List<Object?> get props => [file];
 }

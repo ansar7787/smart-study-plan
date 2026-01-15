@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dartz/dartz.dart';
 import '../../domain/entities/user.dart';
 import '../../domain/repositories/user_repository.dart';
@@ -96,6 +98,19 @@ class UserRepositoryImpl implements UserRepository {
     await remote.updateUser(model);
     await local.saveUser(model);
     return Right(model.toEntity());
+  }
+
+  @override
+  Future<Either<Failure, String>> uploadProfilePhoto({
+    required String userId,
+    required File file,
+  }) async {
+    try {
+      final url = await remote.uploadProfilePhoto(userId: userId, file: file);
+      return Right(url);
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
   }
 
   @override

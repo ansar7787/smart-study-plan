@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dartz/dartz.dart';
 import '../entities/user.dart';
 import '../../../../core/error/failures.dart';
@@ -39,6 +41,11 @@ abstract class UserRepository {
 
   /// Update profile (name / photo only)
   Future<Either<Failure, User>> updateUser(User user);
+
+  Future<Either<Failure, String>> uploadProfilePhoto({
+    required String userId,
+    required File file,
+  });
 
   /// Delete local + remote user data
   Future<Either<Failure, void>> deleteUser(String userId);

@@ -130,7 +130,9 @@ import 'package:smart_study_plan/features/user_management/domain/usecases/logout
 import 'package:smart_study_plan/features/user_management/domain/usecases/register_user.dart';
 import 'package:smart_study_plan/features/user_management/domain/usecases/reset_password.dart';
 import 'package:smart_study_plan/features/user_management/domain/usecases/update_user.dart';
+import 'package:smart_study_plan/features/user_management/domain/usecases/upload_user_avatar.dart';
 import 'package:smart_study_plan/features/user_management/presentation/bloc/user_bloc.dart';
+import 'package:smart_study_plan/features/user_management/presentation/cubit/reset_password_cubit.dart';
 
 final getIt = GetIt.instance;
 
@@ -195,7 +197,7 @@ Future<void> setupServiceLocator() async {
 
   getIt.registerSingleton<UserLocalDatasource>(userLocal);
   getIt.registerSingleton<UserRemoteDatasource>(
-    UserRemoteDatasourceImpl(firebaseAuth, firestore),
+    UserRemoteDatasourceImpl(firebaseAuth, firestore, storage),
   );
 
   getIt.registerSingleton<UserRepository>(
@@ -211,6 +213,12 @@ Future<void> setupServiceLocator() async {
   getIt.registerLazySingleton(
     () => ResetPasswordUseCase(getIt<UserRepository>()),
   );
+  getIt.registerLazySingleton(() => UploadUserAvatarUseCase(getIt()));
+
+  getIt.registerFactory(
+    () => ResetPasswordCubit(getIt<ResetPasswordUseCase>()),
+  );
+
   // ✅ FIX: UserBloc must be FACTORY
   getIt.registerFactory<UserBloc>(
     () => UserBloc(
@@ -219,7 +227,7 @@ Future<void> setupServiceLocator() async {
       getCurrentUserUseCase: getIt(),
       logoutUserUseCase: getIt(),
       updateUserUseCase: getIt(),
-      resetPasswordUseCase: getIt(),
+      uploadUserAvatarUseCase: getIt(),
     ),
   );
 

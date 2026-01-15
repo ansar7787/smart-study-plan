@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:smart_study_plan/config/app_shell/presentation/app_shell.dart';
 import 'package:smart_study_plan/features/admin_panel/presentation/admin_shell/admin_shell.dart';
-
 import 'package:smart_study_plan/features/admin_panel/presentation/pages/admin_dashboard.dart';
 import 'package:smart_study_plan/features/admin_panel/presentation/pages/user_management_page.dart';
 import 'package:smart_study_plan/features/admin_panel/presentation/pages/admin_user_progress_page.dart';
@@ -59,7 +57,6 @@ class AppRouteNames {
   static const calendar = 'calendar';
   static const analytics = 'analytics';
   static const resources = 'resources';
-  static const discussionBoard = 'discussion_board';
   static const reminders = 'reminders';
   static const knowledge = 'knowledge';
 }
@@ -74,25 +71,24 @@ class AppRoutePaths {
   static const register = '/register';
   static const forgotPassword = '/forgot-password';
   static const resetEmailSent = '/reset-email-sent';
+
   static const home = '/home';
   static const profile = '/profile';
+  static const subjects = '/subjects';
+  static const calendar = '/calendar';
+  static const resources = '/resources';
+  static const analytics = '/analytics';
+  static const knowledge = '/knowledge';
+  static const reminders = '/reminders';
+
+  static const subjectForm = '/subject-form';
+  static const tasks = '/tasks/:subjectId';
+  static const taskForm = '/task-form';
 
   // ADMIN
   static const adminDashboard = '/admin/dashboard';
   static const userManagement = '/admin/users';
   static const adminUserProgress = '/admin/user-progress';
-
-  // USER
-  static const subjects = '/subjects';
-  static const subjectForm = '/subject-form';
-  static const tasks = '/tasks/:subjectId';
-  static const taskForm = '/task-form';
-  static const calendar = '/calendar';
-  static const analytics = '/analytics';
-  static const resources = '/resources';
-  static const discussionBoard = '/discussion/:subjectId';
-  static const reminders = '/reminders';
-  static const knowledge = '/knowledge';
 }
 
 // =====================================================
@@ -104,16 +100,8 @@ String _currentUserId(BuildContext context) {
   return state is UserAuthenticated ? state.user.id : '';
 }
 
-bool _isAuthenticated(BuildContext context) =>
-    context.read<UserBloc>().state is UserAuthenticated;
-
-bool _isAdmin(BuildContext context) {
-  final state = context.read<UserBloc>().state;
-  return state is UserAuthenticated && state.user.isAdmin;
-}
-
 // =====================================================
-// GO ROUTER (ADMIN + USER)
+// GO ROUTER
 // =====================================================
 
 final appRouter = GoRouter(
@@ -121,20 +109,35 @@ final appRouter = GoRouter(
 
   redirect: (context, state) {
     final location = state.matchedLocation;
-    final loggedIn = _isAuthenticated(context);
-    final admin = _isAdmin(context);
+    final blocState = context.read<UserBloc>().state;
 
-    // Protect admin routes
+    // ✅ Always allow splash & reset flow
+    if (location == AppRoutePaths.splash ||
+        location == AppRoutePaths.forgotPassword ||
+        location == AppRoutePaths.resetEmailSent) {
+      return null;
+    }
+
+    final loggedIn = blocState is UserAuthenticated;
+    final admin = loggedIn && blocState.user.isAdmin;
+
+    // 🔒 Admin protection
     if (location.startsWith('/admin')) {
       if (!loggedIn) return AppRoutePaths.login;
       if (!admin) return AppRoutePaths.home;
     }
 
-    // Block auth pages after login
+    // 🔐 Auth guard
+    if (!loggedIn &&
+        location != AppRoutePaths.login &&
+        location != AppRoutePaths.register) {
+      return AppRoutePaths.login;
+    }
+
+    // 🚫 Block auth pages after login
     if (loggedIn &&
         (location == AppRoutePaths.login ||
-            location == AppRoutePaths.register ||
-            location == AppRoutePaths.splash)) {
+            location == AppRoutePaths.register)) {
       return AppRoutePaths.home;
     }
 
@@ -142,7 +145,7 @@ final appRouter = GoRouter(
   },
 
   routes: [
-    // ---------------- AUTH ----------------
+    /// AUTH
     GoRoute(
       path: AppRoutePaths.splash,
       name: AppRouteNames.splash,
@@ -158,55 +161,64 @@ final appRouter = GoRouter(
       name: AppRouteNames.register,
       builder: (_, _) => const RegisterPage(),
     ),
-
     GoRoute(
       path: AppRoutePaths.forgotPassword,
       name: AppRouteNames.forgotPassword,
       builder: (_, _) => const ForgotPasswordPage(),
     ),
-
     GoRoute(
       path: AppRoutePaths.resetEmailSent,
       name: AppRouteNames.resetEmailSent,
       builder: (_, _) => const ResetEmailSentPage(),
     ),
 
-    // ---------------- USER APP ----------------
-    ShellRoute(
-      builder: (_, _, child) => AppShell(child: child),
-      routes: [
-        GoRoute(
-          path: AppRoutePaths.home,
-          name: AppRouteNames.home,
-          builder: (_, _) => const HomePage(),
-        ),
-        GoRoute(
-          path: AppRoutePaths.subjects,
-          name: AppRouteNames.subjects,
-          builder: (context, _) =>
-              SubjectListPage(userId: _currentUserId(context)),
-        ),
-        GoRoute(
-          path: AppRoutePaths.calendar,
-          name: AppRouteNames.calendar,
-          builder: (context, _) =>
-              CalendarPage(userId: _currentUserId(context)),
-        ),
-        GoRoute(
-          path: AppRoutePaths.resources,
-          name: AppRouteNames.resources,
-          builder: (context, _) =>
-              ResourceLibraryPage(userId: _currentUserId(context)),
-        ),
-        GoRoute(
-          path: AppRoutePaths.profile,
-          name: AppRouteNames.profile,
-          builder: (_, _) => const ProfilePage(),
-        ),
-      ],
+    /// USER (NO SHELL, FULL SCREEN)
+    GoRoute(
+      path: AppRoutePaths.home,
+      name: AppRouteNames.home,
+      builder: (_, _) => const HomePage(),
+    ),
+    GoRoute(
+      path: AppRoutePaths.profile,
+      name: AppRouteNames.profile,
+      builder: (_, _) => const ProfilePage(),
+    ),
+    GoRoute(
+      path: AppRoutePaths.subjects,
+      name: AppRouteNames.subjects,
+      builder: (context, _) => SubjectListPage(userId: _currentUserId(context)),
+    ),
+    GoRoute(
+      path: AppRoutePaths.calendar,
+      name: AppRouteNames.calendar,
+      builder: (context, _) => CalendarPage(userId: _currentUserId(context)),
+    ),
+    GoRoute(
+      path: AppRoutePaths.resources,
+      name: AppRouteNames.resources,
+      builder: (context, _) =>
+          ResourceLibraryPage(userId: _currentUserId(context)),
+    ),
+    GoRoute(
+      path: AppRoutePaths.analytics,
+      name: AppRouteNames.analytics,
+      builder: (context, _) =>
+          AnalyticsDashboardPage(userId: _currentUserId(context)),
+    ),
+    GoRoute(
+      path: AppRoutePaths.knowledge,
+      name: AppRouteNames.knowledge,
+      builder: (context, _) =>
+          KnowledgeHubPage(userId: _currentUserId(context)),
+    ),
+    GoRoute(
+      path: AppRoutePaths.reminders,
+      name: AppRouteNames.reminders,
+      builder: (context, _) =>
+          ReminderListPage(userId: _currentUserId(context)),
     ),
 
-    // ---------------- ADMIN APP ----------------
+    /// ADMIN (KEEP SHELL)
     ShellRoute(
       builder: (_, _, child) => AdminShell(child: child),
       routes: [
@@ -228,7 +240,7 @@ final appRouter = GoRouter(
       ],
     ),
 
-    // ---------------- OTHER ----------------
+    /// OTHER
     GoRoute(
       path: AppRoutePaths.subjectForm,
       name: AppRouteNames.subjectForm,
@@ -250,24 +262,6 @@ final appRouter = GoRouter(
       path: AppRoutePaths.taskForm,
       name: AppRouteNames.taskForm,
       builder: (_, state) => TaskFormPage(task: state.extra as Task?),
-    ),
-    GoRoute(
-      path: AppRoutePaths.analytics,
-      name: AppRouteNames.analytics,
-      builder: (context, _) =>
-          AnalyticsDashboardPage(userId: _currentUserId(context)),
-    ),
-    GoRoute(
-      path: AppRoutePaths.knowledge,
-      name: AppRouteNames.knowledge,
-      builder: (context, _) =>
-          KnowledgeHubPage(userId: _currentUserId(context)),
-    ),
-    GoRoute(
-      path: AppRoutePaths.reminders,
-      name: AppRouteNames.reminders,
-      builder: (_, state) =>
-          ReminderListPage(userId: state.extra as String? ?? ''),
     ),
   ],
 );

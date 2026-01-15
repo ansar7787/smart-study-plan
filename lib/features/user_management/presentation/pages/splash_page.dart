@@ -104,13 +104,7 @@ class _SplashPageState extends State<SplashPage>
                     borderRadius: BorderRadius.circular(20),
                   ),
                   padding: const EdgeInsets.all(18),
-                  child: SvgPicture.asset(
-                    'assets/logo/app_logo.svg',
-                    colorFilter: ColorFilter.mode(
-                      theme.colorScheme.primary,
-                      BlendMode.srcIn,
-                    ),
-                  ),
+                  child: SvgPicture.asset('assets/logo/app_logo.svg'),
                 ),
 
                 const SizedBox(height: 28),

@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../models/user_model.dart';
 
 abstract class UserRemoteDatasource {
@@ -25,13 +28,19 @@ abstract class UserRemoteDatasource {
   Future<void> updateUser(UserModel user);
 
   Future<void> deleteUser(String userId);
+
+  Future<String> uploadProfilePhoto({
+    required String userId,
+    required File file,
+  });
 }
 
 class UserRemoteDatasourceImpl implements UserRemoteDatasource {
   final FirebaseAuth auth;
   final FirebaseFirestore firestore;
+  final FirebaseStorage storage;
 
-  UserRemoteDatasourceImpl(this.auth, this.firestore);
+  UserRemoteDatasourceImpl(this.auth, this.firestore, this.storage);
 
   @override
   Future<UserModel> registerUser({
@@ -102,6 +111,16 @@ class UserRemoteDatasourceImpl implements UserRemoteDatasource {
       'photoUrl': user.photoUrl,
       'updatedAt': user.updatedAt.toIso8601String(),
     });
+  }
+
+  @override
+  Future<String> uploadProfilePhoto({
+    required String userId,
+    required File file,
+  }) async {
+    final ref = storage.ref().child('avatars/$userId.jpg');
+    await ref.putFile(file);
+    return await ref.getDownloadURL();
   }
 
   @override

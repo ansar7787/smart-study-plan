@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:smart_study_plan/core/usecase/usecase.dart';
@@ -7,8 +9,8 @@ import 'package:smart_study_plan/features/user_management/domain/usecases/get_cu
 import 'package:smart_study_plan/features/user_management/domain/usecases/login_user.dart';
 import 'package:smart_study_plan/features/user_management/domain/usecases/logout_user.dart';
 import 'package:smart_study_plan/features/user_management/domain/usecases/register_user.dart';
-import 'package:smart_study_plan/features/user_management/domain/usecases/reset_password.dart';
 import 'package:smart_study_plan/features/user_management/domain/usecases/update_user.dart';
+import 'package:smart_study_plan/features/user_management/domain/usecases/upload_user_avatar.dart';
 
 part 'user_event.dart';
 part 'user_state.dart';
@@ -19,7 +21,7 @@ class UserBloc extends Bloc<UserEvent, UserState> {
   final GetCurrentUserUseCase getCurrentUserUseCase;
   final LogoutUserUseCase logoutUserUseCase;
   final UpdateUserUseCase updateUserUseCase;
-  final ResetPasswordUseCase resetPasswordUseCase;
+  final UploadUserAvatarUseCase uploadUserAvatarUseCase;
 
   UserBloc({
     required this.registerUserUseCase,
@@ -27,7 +29,7 @@ class UserBloc extends Bloc<UserEvent, UserState> {
     required this.getCurrentUserUseCase,
     required this.logoutUserUseCase,
     required this.updateUserUseCase,
-    required this.resetPasswordUseCase,
+    required this.uploadUserAvatarUseCase,
   }) : super(const UserInitial()) {
     on<RegisterUserEvent>(_onRegisterUser);
     on<LoginUserEvent>(_onLoginUser);
@@ -35,8 +37,10 @@ class UserBloc extends Bloc<UserEvent, UserState> {
     on<CheckAuthStatusEvent>(_onCheckAuthStatus);
     on<GetCurrentUserEvent>(_onGetCurrentUser);
     on<UpdateUserEvent>(_onUpdateUser);
-    on<ResetPasswordEvent>(_onResetPassword);
+    on<UpdateUserAvatarEvent>(_onUpdateUserAvatar);
   }
+
+  /* ───────────────── AUTH ───────────────── */
 
   Future<void> _onRegisterUser(
     RegisterUserEvent event,
@@ -54,7 +58,7 @@ class UserBloc extends Bloc<UserEvent, UserState> {
 
     result.fold(
       (failure) => emit(UserError(failure.message)),
-      (user) => emit(UserRegisterSuccess(user)),
+      (user) => emit(UserAuthenticated(user)),
     );
   }
 
@@ -70,7 +74,7 @@ class UserBloc extends Bloc<UserEvent, UserState> {
 
     result.fold(
       (failure) => emit(UserError(failure.message)),
-      (user) => emit(UserLoginSuccess(user)),
+      (user) => emit(UserAuthenticated(user)),
     );
   }
 
@@ -91,7 +95,8 @@ class UserBloc extends Bloc<UserEvent, UserState> {
     );
   }
 
-  // In UserBloc
+  /* ───────────────── AUTH STATE ───────────────── */
+
   Future<void> _onCheckAuthStatus(
     CheckAuthStatusEvent event,
     Emitter<UserState> emit,
@@ -100,21 +105,13 @@ class UserBloc extends Bloc<UserEvent, UserState> {
 
     final result = await getCurrentUserUseCase(const NoParams());
 
-    result.fold(
-      (failure) {
-        AppLogger.d('User not authenticated: ${failure.message}');
+    result.fold((_) => emit(const UserNotAuthenticated()), (user) {
+      if (user == null) {
         emit(const UserNotAuthenticated());
-      },
-      (user) {
-        if (user == null) {
-          AppLogger.d('No current user found');
-          emit(const UserNotAuthenticated());
-        } else {
-          AppLogger.d('User is authenticated: ${user.email}');
-          emit(UserAuthenticated(user));
-        }
-      },
-    );
+      } else {
+        emit(UserAuthenticated(user));
+      }
+    });
   }
 
   Future<void> _onGetCurrentUser(
@@ -125,19 +122,16 @@ class UserBloc extends Bloc<UserEvent, UserState> {
 
     final result = await getCurrentUserUseCase(const NoParams());
 
-    result.fold(
-      (failure) {
-        emit(UserError(failure.message));
-      },
-      (user) {
-        if (user == null) {
-          emit(const UserNotAuthenticated());
-        } else {
-          emit(UserAuthenticated(user));
-        }
-      },
-    );
+    result.fold((failure) => emit(UserError(failure.message)), (user) {
+      if (user == null) {
+        emit(const UserNotAuthenticated());
+      } else {
+        emit(UserAuthenticated(user));
+      }
+    });
   }
+
+  /* ───────────────── PROFILE UPDATE ───────────────── */
 
   Future<void> _onUpdateUser(
     UpdateUserEvent event,
@@ -166,17 +160,41 @@ class UserBloc extends Bloc<UserEvent, UserState> {
     );
   }
 
-  Future<void> _onResetPassword(
-    ResetPasswordEvent event,
+  /* ───────────────── AVATAR UPLOAD ───────────────── */
+
+  Future<void> _onUpdateUserAvatar(
+    UpdateUserAvatarEvent event,
     Emitter<UserState> emit,
   ) async {
-    emit(const UserLoading(message: 'Sending reset link...'));
+    if (state is! UserAuthenticated) {
+      emit(const UserError('User not authenticated'));
+      return;
+    }
 
-    final result = await resetPasswordUseCase(event.email);
+    final currentUser = (state as UserAuthenticated).user;
 
-    result.fold(
-      (f) => emit(UserError(f.message)),
-      (_) => emit(const UserLoggedOut()),
+    emit(const UserLoading(message: 'Uploading photo...'));
+
+    final uploadResult = await uploadUserAvatarUseCase(
+      userId: currentUser.id,
+      file: event.file,
+    );
+
+    await uploadResult.fold(
+      (failure) async => emit(UserError(failure.message)),
+      (url) async {
+        final updatedUser = currentUser.copyWith(
+          photoUrl: url,
+          updatedAt: DateTime.now(),
+        );
+
+        final result = await updateUserUseCase(updatedUser);
+
+        result.fold(
+          (f) => emit(UserError(f.message)),
+          (user) => emit(UserAuthenticated(user)),
+        );
+      },
     );
   }
 }

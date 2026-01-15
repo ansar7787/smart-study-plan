@@ -43,7 +43,10 @@ class MyApp extends StatelessWidget {
       builder: (_, _) {
         return MultiBlocProvider(
           providers: [
-            BlocProvider(create: (_) => getIt<UserBloc>()),
+            BlocProvider(
+              create: (_) =>
+                  getIt<UserBloc>()..add(const CheckAuthStatusEvent()),
+            ),
             BlocProvider(create: (_) => getIt<AdminUsersBloc>()),
             BlocProvider(create: (_) => getIt<SubjectBloc>()),
             BlocProvider(create: (_) => getIt<TaskBloc>()),
