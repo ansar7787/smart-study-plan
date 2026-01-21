@@ -53,7 +53,6 @@ Explore the application interface:
 
 ### 🔐 1. Advanced Authentication & User Management
 *   **Sign Up & Login**: Robust email/password authentication via Firebase Auth.
-*   **Google Sign-In**: One-tap social login for quick access.
 *   **Forgot Password**: Automated email recovery flow.
 *   **Splash & Onboarding**: Engaging introductory experience for first-time users.
 
