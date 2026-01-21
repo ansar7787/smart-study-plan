@@ -47,14 +47,13 @@
 
 ## 📱 Screenshots
 
-| Onboarding | Dashboard | Study Timer |
+| User Profile | Knowledge Hub | Analytics Trends |
 |:---:|:---:|:---:|
-| <img src="assets/images/onboarding_3d_1.png" width="200" /> | <img src="assets/images/onboarding_analytics.png" width="200" /> | <img src="assets/images/onboarding_plan.png" width="200" /> |
+| <img src="assets/images/screenshots/profile_screen.jpg" width="200" /> | <img src="assets/images/screenshots/knowledge_hub.jpg" width="200" /> | <img src="assets/images/screenshots/analytics_trends.jpg" width="200" /> |
 
-| Task List | Resource Library | Analytics |
-|:---:|:---:|:---:|
-| <!-- Add Task List Screenshot --> | <!-- Add Resource Lib Screenshot --> | <!-- Add Analytics Screenshot --> |
-*(Add your app screenshots here)*
+| Analytics Focus | Your Progress |
+|:---:|:---:|
+| <img src="assets/images/screenshots/analytics_focus.jpg" width="200" /> | <img src="assets/images/screenshots/analytics_progress.jpg" width="200" /> |
 
 ## 🛠️ Technology Stack
 
