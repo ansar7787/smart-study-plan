@@ -9,9 +9,11 @@ class AnalyticsAiService {
   AnalyticsAiService(this.aiRepository);
 
   Future<Either<Failure, String>> generateInsight(
+    String userId,
     String analyticsSummary,
   ) async {
     final result = await aiRepository.runAction(
+      userId: userId,
       action: AiActionType.summarize,
       input:
           'Generate a motivational insight from this analytics:\n$analyticsSummary',

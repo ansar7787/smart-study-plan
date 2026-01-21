@@ -6,6 +6,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:get_it/get_it.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:smart_study_plan/config/theme/bloc/theme_cubit.dart';
 import 'package:smart_study_plan/features/admin_panel/data/datasources/admin_local_datasource.dart';
 import 'package:smart_study_plan/features/admin_panel/data/datasources/admin_remote_datasource.dart';
 import 'package:smart_study_plan/features/admin_panel/data/repositories/admin_repository_impl.dart';
@@ -16,7 +18,8 @@ import 'package:smart_study_plan/features/admin_panel/domain/usecases/get_all_us
 import 'package:smart_study_plan/features/admin_panel/presentation/bloc/admin_analytics/admin_analytics_bloc.dart';
 import 'package:smart_study_plan/features/admin_panel/presentation/bloc/admin_dashboard/admin_dashboard_bloc.dart';
 import 'package:smart_study_plan/features/admin_panel/presentation/bloc/admin_users/admin_users_bloc.dart';
-import 'package:smart_study_plan/features/knowledge/data/datasources/ai_openai_datasource.dart';
+import 'package:smart_study_plan/features/onboarding/presentation/bloc/onboarding_bloc.dart';
+import 'package:smart_study_plan/features/knowledge/data/datasources/ai_gemini_datasource.dart';
 import 'package:smart_study_plan/features/knowledge/data/datasources/ai_remote_datasource.dart';
 import 'package:smart_study_plan/core/network/network_info.dart';
 import 'package:smart_study_plan/core/utils/logger.dart';
@@ -92,6 +95,7 @@ import 'package:smart_study_plan/features/tasks/domain/repositories/task_reposit
 import 'package:smart_study_plan/features/tasks/domain/usecases/create_task.dart';
 import 'package:smart_study_plan/features/tasks/domain/usecases/delete_task.dart';
 import 'package:smart_study_plan/features/tasks/domain/usecases/get_tasks_by_subject.dart';
+import 'package:smart_study_plan/features/tasks/domain/usecases/get_tasks_by_user.dart';
 import 'package:smart_study_plan/features/tasks/domain/usecases/update_task.dart';
 import 'package:smart_study_plan/features/tasks/presentation/bloc/task_bloc.dart';
 
@@ -131,6 +135,7 @@ import 'package:smart_study_plan/features/user_management/domain/usecases/regist
 import 'package:smart_study_plan/features/user_management/domain/usecases/reset_password.dart';
 import 'package:smart_study_plan/features/user_management/domain/usecases/update_user.dart';
 import 'package:smart_study_plan/features/user_management/domain/usecases/upload_user_avatar.dart';
+
 import 'package:smart_study_plan/features/user_management/presentation/bloc/user_bloc.dart';
 import 'package:smart_study_plan/features/user_management/presentation/cubit/reset_password_cubit.dart';
 
@@ -138,6 +143,13 @@ final getIt = GetIt.instance;
 
 Future<void> setupServiceLocator() async {
   AppLogger.d('Setting up service locator...');
+
+  // ========== LOCAL STORAGE ==========
+  final prefs = await SharedPreferences.getInstance();
+  getIt.registerSingleton<SharedPreferences>(prefs);
+
+  // ========== THEME ==========
+  getIt.registerFactory(() => ThemeCubit(getIt()));
 
   // ========== FIREBASE ==========
   await Firebase.initializeApp();
@@ -180,15 +192,12 @@ Future<void> setupServiceLocator() async {
   // HTTP client
   getIt.registerLazySingleton<http.Client>(() => http.Client());
 
-  // OpenAI remote datasource
+  // Gemini remote datasource (REPLACED OPENAI)
   getIt.registerLazySingleton<AiRemoteDataSource>(
-    () => AiOpenAiDataSource(client: getIt<http.Client>()),
+    () => AiGeminiDataSource(client: getIt<http.Client>()),
   );
 
-  // AI repository
-  getIt.registerLazySingleton<AiRepository>(
-    () => AiRepositoryImpl(getIt<AiRemoteDataSource>()),
-  );
+  // AI repository (MOVED DOWN TO ACCESS UserRemoteDatasource)
 
   // ========== USER FEATURE ==========
 
@@ -202,6 +211,11 @@ Future<void> setupServiceLocator() async {
 
   getIt.registerSingleton<UserRepository>(
     UserRepositoryImpl(local: getIt(), remote: getIt()),
+  );
+
+  // AI repository (INJECTED userRemote)
+  getIt.registerLazySingleton<AiRepository>(
+    () => AiRepositoryImpl(getIt(), getIt()),
   );
 
   getIt.registerSingleton(RegisterUserUseCase(getIt()));
@@ -229,6 +243,11 @@ Future<void> setupServiceLocator() async {
       updateUserUseCase: getIt(),
       uploadUserAvatarUseCase: getIt(),
     ),
+  );
+
+  // ========== ONBOARDING ==========
+  getIt.registerFactory<OnboardingBloc>(
+    () => OnboardingBloc(getIt<SharedPreferences>()),
   );
 
   // ================= ADMIN ANALYTICS =================
@@ -342,6 +361,7 @@ Future<void> setupServiceLocator() async {
   );
 
   getIt.registerSingleton(GetTasksBySubjectUsecase(repository: getIt()));
+  getIt.registerSingleton(GetTasksByUserUsecase(repository: getIt()));
   getIt.registerSingleton(CreateTaskUsecase(repository: getIt()));
   getIt.registerSingleton(UpdateTaskUsecase(repository: getIt()));
   getIt.registerSingleton(DeleteTaskUsecase(repository: getIt()));
@@ -349,6 +369,7 @@ Future<void> setupServiceLocator() async {
   getIt.registerFactory(
     () => TaskBloc(
       getTasksBySubjectUsecase: getIt(),
+      getTasksByUserUsecase: getIt(),
       createTaskUsecase: getIt(),
       updateTaskUsecase: getIt(),
       deleteTaskUsecase: getIt(),

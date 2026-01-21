@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class AuthCard extends StatelessWidget {
   final Widget child;
@@ -7,20 +8,11 @@ class AuthCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Transparent wrapper now, full width but constrained for tablets
     return Container(
-      width: 420,
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 30,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
+      width: double.infinity,
+      constraints: BoxConstraints(maxWidth: 500.w),
+      // No more padding here, handled by Scaffold or page
       child: child,
     );
   }

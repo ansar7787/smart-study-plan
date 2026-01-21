@@ -30,13 +30,15 @@ class StudySessionModelAdapter extends TypeAdapter<StudySessionModel> {
       recurrencePattern: fields[10] as String?,
       createdAt: fields[11] as DateTime,
       updatedAt: fields[12] as DateTime,
+      actualDuration: fields[13] as int?,
+      isCompleted: fields[14] == null ? false : fields[14] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, StudySessionModel obj) {
     writer
-      ..writeByte(13)
+      ..writeByte(15)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -62,7 +64,11 @@ class StudySessionModelAdapter extends TypeAdapter<StudySessionModel> {
       ..writeByte(11)
       ..write(obj.createdAt)
       ..writeByte(12)
-      ..write(obj.updatedAt);
+      ..write(obj.updatedAt)
+      ..writeByte(13)
+      ..write(obj.actualDuration)
+      ..writeByte(14)
+      ..write(obj.isCompleted);
   }
 
   @override

@@ -1,34 +1,30 @@
 part of 'admin_analytics_bloc.dart';
 
-abstract class AdminAnalyticsState extends Equatable {
-  const AdminAnalyticsState();
+enum AdminAnalyticsStatus { initial, loading, success, failure }
 
-  @override
-  List<Object?> get props => [];
-}
-
-class AdminAnalyticsInitial extends AdminAnalyticsState {
-  const AdminAnalyticsInitial();
-}
-
-class AdminAnalyticsLoading extends AdminAnalyticsState {
-  const AdminAnalyticsLoading();
-}
-
-class AllUserProgressLoaded extends AdminAnalyticsState {
+class AdminAnalyticsState extends Equatable {
+  final AdminAnalyticsStatus status;
   final List<UserProgress> usersProgress;
+  final String? errorMessage;
 
-  const AllUserProgressLoaded(this.usersProgress);
+  const AdminAnalyticsState({
+    this.status = AdminAnalyticsStatus.initial,
+    this.usersProgress = const [],
+    this.errorMessage,
+  });
+
+  AdminAnalyticsState copyWith({
+    AdminAnalyticsStatus? status,
+    List<UserProgress>? usersProgress,
+    String? errorMessage,
+  }) {
+    return AdminAnalyticsState(
+      status: status ?? this.status,
+      usersProgress: usersProgress ?? this.usersProgress,
+      errorMessage: errorMessage,
+    );
+  }
 
   @override
-  List<Object?> get props => [usersProgress];
-}
-
-class AdminAnalyticsError extends AdminAnalyticsState {
-  final String message;
-
-  const AdminAnalyticsError(this.message);
-
-  @override
-  List<Object?> get props => [message];
+  List<Object?> get props => [status, usersProgress, errorMessage];
 }

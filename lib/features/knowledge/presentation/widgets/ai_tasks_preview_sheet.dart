@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:smart_study_plan/features/knowledge/domain/usecases/create_tasks_from_ai_usecase.dart';
 
@@ -27,28 +28,34 @@ class _AiTasksPreviewSheetState extends State<AiTasksPreviewSheet> {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        left: 16.w,
+        right: 16.w,
+        top: 16.h,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16.h,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ---------- HEADER ----------
-          const Text(
+          Text(
             'Create Tasks from AI',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12.h),
 
           // ---------- SUBJECT PICKER (BONUS UX) ----------
           DropdownButtonFormField<String>(
             initialValue: _selectedSubjectId,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Subject',
-              border: OutlineInputBorder(),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 16.w,
+                vertical: 12.h,
+              ),
             ),
             items: const [
               DropdownMenuItem(value: 'unassigned', child: Text('Unassigned')),
@@ -61,11 +68,11 @@ class _AiTasksPreviewSheetState extends State<AiTasksPreviewSheet> {
             },
           ),
 
-          const SizedBox(height: 16),
+          SizedBox(height: 16.h),
 
           // ---------- TASK LIST ----------
           ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 300),
+            constraints: BoxConstraints(maxHeight: 300.h),
             child: ListView.separated(
               shrinkWrap: true,
               itemCount: widget.tasks.length,
@@ -73,18 +80,21 @@ class _AiTasksPreviewSheetState extends State<AiTasksPreviewSheet> {
               itemBuilder: (_, index) {
                 final task = widget.tasks[index];
                 return ListTile(
-                  leading: const Icon(Icons.task_alt),
-                  title: Text(task.title),
+                  leading: Icon(Icons.task_alt, size: 24.r),
+                  title: Text(task.title, style: TextStyle(fontSize: 14.sp)),
                   subtitle:
                       task.description != null && task.description!.isNotEmpty
-                      ? Text(task.description!)
+                      ? Text(
+                          task.description!,
+                          style: TextStyle(fontSize: 12.sp),
+                        )
                       : null,
                 );
               },
             ),
           ),
 
-          const SizedBox(height: 20),
+          SizedBox(height: 20.h),
 
           // ---------- ACTIONS ----------
           Row(
@@ -92,20 +102,32 @@ class _AiTasksPreviewSheetState extends State<AiTasksPreviewSheet> {
               Expanded(
                 child: OutlinedButton(
                   onPressed: _isLoading ? null : () => Navigator.pop(context),
-                  child: const Text('Cancel'),
+                  style: OutlinedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(vertical: 12.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                  ),
+                  child: Text('Cancel', style: TextStyle(fontSize: 14.sp)),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12.w),
               Expanded(
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _createTasks,
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(vertical: 12.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                  ),
                   child: _isLoading
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                      ? SizedBox(
+                          height: 18.r,
+                          width: 18.r,
+                          child: CircularProgressIndicator(strokeWidth: 2.r),
                         )
-                      : const Text('Create Tasks'),
+                      : Text('Create Tasks', style: TextStyle(fontSize: 14.sp)),
                 ),
               ),
             ],

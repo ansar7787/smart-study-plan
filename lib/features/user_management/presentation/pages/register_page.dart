@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:smart_study_plan/config/routes/app_routes.dart';
@@ -24,6 +25,11 @@ class _RegisterPageState extends State<RegisterPage> {
   final _password = TextEditingController();
   final _confirm = TextEditingController();
 
+  final _nameFocus = FocusNode();
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
+  final _confirmFocus = FocusNode();
+
   bool _hidePassword = true;
   bool _hideConfirm = true;
 
@@ -33,6 +39,10 @@ class _RegisterPageState extends State<RegisterPage> {
     _email.dispose();
     _password.dispose();
     _confirm.dispose();
+    _nameFocus.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
+    _confirmFocus.dispose();
     super.dispose();
   }
 
@@ -52,24 +62,28 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget build(BuildContext context) {
     return AuthScaffold(
       child: BlocListener<UserBloc, UserState>(
-        listenWhen: (p, c) => p is UserLoading && c is! UserLoading,
+        listenWhen: (p, c) =>
+            p.status == UserStatus.loading && c.status != UserStatus.loading,
         listener: (context, state) {
-          if (state is UserAuthenticated) {
-            context.goNamed(AppRouteNames.login);
+          if (state.status == UserStatus.authenticated) {
+            // Navigate to home on successful registration
+            context.goNamed(AppRouteNames.home);
           }
 
-          if (state is UserError) {
+          if (state.status == UserStatus.failure &&
+              state.errorMessage != null) {
             ScaffoldMessenger.of(
               context,
-            ).showSnackBar(SnackBar(content: Text(state.message)));
+            ).showSnackBar(SnackBar(content: Text(state.errorMessage!)));
           }
         },
         child: AuthCard(
           child: Form(
             key: _formKey,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                SizedBox(height: 10.h), // Reduced top spacing
                 const AuthHeader(
                   title: 'Create account',
                   subtitle: 'Sign up to start planning smarter',
@@ -78,26 +92,32 @@ class _RegisterPageState extends State<RegisterPage> {
                 AuthTextField(
                   label: 'Full name',
                   controller: _name,
+                  focusNode: _nameFocus,
+                  nextFocusNode: _emailFocus,
                   hint: 'John Doe',
                   icon: Icons.person_outline,
                   validator: (v) =>
                       v != null && v.isNotEmpty ? null : 'Name required',
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 12.h), // Less gap
 
                 AuthTextField(
                   label: 'Email',
                   controller: _email,
+                  focusNode: _emailFocus,
+                  nextFocusNode: _passwordFocus,
                   hint: 'you@example.com',
                   icon: Icons.email_outlined,
                   validator: (v) =>
                       v != null && v.contains('@') ? null : 'Invalid email',
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 12.h), // Less gap
 
                 AuthTextField(
                   label: 'Password',
                   controller: _password,
+                  focusNode: _passwordFocus,
+                  nextFocusNode: _confirmFocus,
                   hint: '••••••••',
                   icon: Icons.lock_outline,
                   obscureText: _hidePassword,
@@ -110,14 +130,16 @@ class _RegisterPageState extends State<RegisterPage> {
                       _hidePassword
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined,
+                      size: 20.sp,
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 12.h), // Less gap
 
                 AuthTextField(
                   label: 'Confirm password',
                   controller: _confirm,
+                  focusNode: _confirmFocus,
                   hint: '••••••••',
                   icon: Icons.lock_outline,
                   obscureText: _hideConfirm,
@@ -130,30 +152,50 @@ class _RegisterPageState extends State<RegisterPage> {
                       _hideConfirm
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined,
+                      size: 20.sp,
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 24),
+                SizedBox(height: 24.h),
 
                 BlocBuilder<UserBloc, UserState>(
                   builder: (context, state) {
                     return AuthSubmitButton(
-                      loading: state is UserLoading,
+                      loading: state.status == UserStatus.loading,
                       onPressed: _register,
                       text: 'Create account',
                     );
                   },
                 ),
 
-                const SizedBox(height: 20),
+                SizedBox(height: 24.h),
 
                 Center(
-                  child: TextButton(
-                    onPressed: () => context.goNamed(AppRouteNames.login),
-                    child: const Text('Already have an account? Login'),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "Already have an account?",
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 14.sp,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => context.goNamed(AppRouteNames.login),
+                        child: Text(
+                          "Login",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14.sp,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                SizedBox(height: 20.h), // Standard bottom spacing
               ],
             ),
           ),

@@ -90,6 +90,7 @@ class Reminder extends Equatable {
   // Link to feature
   final String? taskId;
   final String? sessionId;
+  final String? subjectId; // 📂 New field for Folder Logic
 
   final String title;
   final String? description;
@@ -114,6 +115,7 @@ class Reminder extends Equatable {
     required this.userId,
     this.taskId,
     this.sessionId,
+    this.subjectId,
     required this.title,
     this.description,
     required this.reminderTime,
@@ -125,19 +127,33 @@ class Reminder extends Equatable {
 
   bool get isExpired => reminderTime.isBefore(DateTime.now());
 
-  Reminder copyWith({bool? isActive, ReminderStatus? status}) {
+  Reminder copyWith({
+    String? id,
+    String? userId,
+    String? taskId,
+    String? sessionId,
+    String? subjectId,
+    String? title,
+    String? description,
+    DateTime? reminderTime,
+    bool? isActive,
+    ReminderStatus? status,
+    String? reminderType,
+    int? minutesBefore,
+  }) {
     return Reminder(
-      id: id,
-      userId: userId,
-      taskId: taskId,
-      sessionId: sessionId,
-      title: title,
-      description: description,
-      reminderTime: reminderTime,
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      taskId: taskId ?? this.taskId,
+      sessionId: sessionId ?? this.sessionId,
+      subjectId: subjectId ?? this.subjectId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      reminderTime: reminderTime ?? this.reminderTime,
       isActive: isActive ?? this.isActive,
       status: status ?? this.status,
-      reminderType: reminderType,
-      minutesBefore: minutesBefore,
+      reminderType: reminderType ?? this.reminderType,
+      minutesBefore: minutesBefore ?? this.minutesBefore,
     );
   }
 
@@ -147,7 +163,9 @@ class Reminder extends Equatable {
     userId,
     taskId,
     sessionId,
+    subjectId,
     title,
+    description,
     reminderTime,
     isActive,
     status,

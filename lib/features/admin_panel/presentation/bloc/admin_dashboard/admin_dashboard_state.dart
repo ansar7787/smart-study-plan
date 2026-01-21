@@ -1,38 +1,30 @@
 part of 'admin_dashboard_bloc.dart';
 
-abstract class AdminDashboardState extends Equatable {
-  const AdminDashboardState();
+enum AdminDashboardStatus { initial, loading, success, failure }
+
+class AdminDashboardState extends Equatable {
+  final AdminDashboardStatus status;
+  final AdminStats? stats;
+  final String? errorMessage;
+
+  const AdminDashboardState({
+    this.status = AdminDashboardStatus.initial,
+    this.stats,
+    this.errorMessage,
+  });
+
+  AdminDashboardState copyWith({
+    AdminDashboardStatus? status,
+    AdminStats? stats,
+    String? errorMessage,
+  }) {
+    return AdminDashboardState(
+      status: status ?? this.status,
+      stats: stats ?? this.stats,
+      errorMessage: errorMessage,
+    );
+  }
 
   @override
-  List<Object?> get props => [];
-}
-
-/// Initial state
-class AdminDashboardInitial extends AdminDashboardState {
-  const AdminDashboardInitial();
-}
-
-/// Loading state
-class AdminDashboardLoading extends AdminDashboardState {
-  const AdminDashboardLoading();
-}
-
-/// Loaded successfully
-class AdminDashboardLoaded extends AdminDashboardState {
-  final AdminStats stats;
-
-  const AdminDashboardLoaded(this.stats);
-
-  @override
-  List<Object?> get props => [stats];
-}
-
-/// Error state
-class AdminDashboardError extends AdminDashboardState {
-  final String message;
-
-  const AdminDashboardError(this.message);
-
-  @override
-  List<Object?> get props => [message];
+  List<Object?> get props => [status, stats, errorMessage];
 }

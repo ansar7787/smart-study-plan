@@ -29,7 +29,12 @@ class TaskRepositoryImpl implements TaskRepository {
         await localDatasource.cacheTask(model);
         return Right(model.toEntity());
       } else {
-        return Left(NetworkFailure('No internet connection'));
+        // Offline: Save locally only
+        final model = TaskModel.fromEntity(task);
+        await localDatasource.cacheTask(model);
+        // Note: We need a sync mechanism for these later.
+        // For now, return success so user can proceed.
+        return Right(model.toEntity());
       }
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
@@ -58,10 +63,14 @@ class TaskRepositoryImpl implements TaskRepository {
   @override
   Future<Either<Failure, List<Task>>> getTasksBySubject(
     String subjectId,
+    String userId,
   ) async {
     try {
       if (await networkInfo.isConnected) {
-        final result = await remoteDatasource.getTasksBySubject(subjectId);
+        final result = await remoteDatasource.getTasksBySubject(
+          subjectId,
+          userId,
+        );
         // no bulk cache API; optionally cache individually
         for (final model in result) {
           await localDatasource.cacheTask(model);
@@ -84,15 +93,24 @@ class TaskRepositoryImpl implements TaskRepository {
   Future<Either<Failure, List<Task>>> getTasksByUser(String userId) async {
     try {
       if (await networkInfo.isConnected) {
-        final result = await remoteDatasource.getTasksByUser(userId);
-        for (final model in result) {
-          await localDatasource.cacheTask(model);
+        try {
+          final result = await remoteDatasource.getTasksByUser(userId);
+          for (final model in result) {
+            await localDatasource.cacheTask(model);
+          }
+        } catch (_) {
+          // Sync failed, fallback to local
         }
-        return Right(result.map((m) => m.toEntity()).toList());
-      } else {
-        // no user-specific cache API; fall back to empty or subject-based logic
-        return Right(<Task>[]);
       }
+
+      // Always return local cache to ensure offline/unsynced tasks are visible
+      final cached = await localDatasource.getAllCachedTasks();
+      return Right(
+        cached
+            .where((t) => t.userId == userId)
+            .map((m) => m.toEntity())
+            .toList(),
+      );
     } on CacheException catch (e) {
       return Left(CacheFailure(e.message));
     } on ServerException catch (e) {
@@ -106,15 +124,17 @@ class TaskRepositoryImpl implements TaskRepository {
   Future<Either<Failure, List<Task>>> getAllTasks() async {
     try {
       if (await networkInfo.isConnected) {
-        final result = await remoteDatasource.getAllTasks();
-        for (final model in result) {
-          await localDatasource.cacheTask(model);
-        }
-        return Right(result.map((m) => m.toEntity()).toList());
-      } else {
-        // no all-cached API; use clearTaskCache or subject-based cache if needed
-        return Right(<Task>[]);
+        try {
+          final result = await remoteDatasource.getAllTasks();
+          for (final model in result) {
+            await localDatasource.cacheTask(model);
+          }
+        } catch (_) {}
       }
+
+      // Always return local cache
+      final cached = await localDatasource.getAllCachedTasks();
+      return Right(cached.map((m) => m.toEntity()).toList());
     } on CacheException catch (e) {
       return Left(CacheFailure(e.message));
     } on ServerException catch (e) {

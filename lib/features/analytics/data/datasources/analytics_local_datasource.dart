@@ -9,6 +9,7 @@ import '../models/study_goal_model.dart';
 abstract class AnalyticsLocalDataSource {
   Future<Either<Failure, void>> saveOverview({
     required ProgressSnapshotModel snapshot,
+    required ProgressSnapshotModel todaySnapshot, // ✅ NEW
     required ProgressTrendsModel trends,
     required List<AnalyticsInsightModel> insights,
   });
@@ -18,6 +19,7 @@ abstract class AnalyticsLocalDataSource {
       Failure,
       ({
         ProgressSnapshotModel snapshot,
+        ProgressSnapshotModel todaySnapshot, // ✅ NEW
         ProgressTrendsModel trends,
         List<AnalyticsInsightModel> insights,
       })
@@ -38,12 +40,14 @@ class AnalyticsLocalDataSourceImpl implements AnalyticsLocalDataSource {
   @override
   Future<Either<Failure, void>> saveOverview({
     required ProgressSnapshotModel snapshot,
+    required ProgressSnapshotModel todaySnapshot, // ✅ NEW
     required ProgressTrendsModel trends,
     required List<AnalyticsInsightModel> insights,
   }) async {
     try {
       final box = await Hive.openBox(_overviewBox);
       await box.put('snapshot', snapshot);
+      await box.put('today_snapshot', todaySnapshot);
       await box.put('trends', trends);
       await box.put('insights', insights);
       return const Right(null);
@@ -58,6 +62,7 @@ class AnalyticsLocalDataSourceImpl implements AnalyticsLocalDataSource {
       Failure,
       ({
         ProgressSnapshotModel snapshot,
+        ProgressSnapshotModel todaySnapshot, // ✅ NEW
         ProgressTrendsModel trends,
         List<AnalyticsInsightModel> insights,
       })
@@ -68,15 +73,20 @@ class AnalyticsLocalDataSourceImpl implements AnalyticsLocalDataSource {
       final box = await Hive.openBox(_overviewBox);
 
       final snapshot = box.get('snapshot');
+      final todaySnapshot = box.get('today_snapshot');
       final trends = box.get('trends');
       final insights = box.get('insights');
 
-      if (snapshot == null || trends == null || insights == null) {
+      if (snapshot == null ||
+          todaySnapshot == null ||
+          trends == null ||
+          insights == null) {
         return Left(CacheFailure('No cached analytics data'));
       }
 
       return Right((
         snapshot: snapshot as ProgressSnapshotModel,
+        todaySnapshot: todaySnapshot as ProgressSnapshotModel,
         trends: trends as ProgressTrendsModel,
         insights: List<AnalyticsInsightModel>.from(insights as List),
       ));

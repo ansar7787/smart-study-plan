@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:smart_study_plan/di/service_locator.dart';
 import 'package:smart_study_plan/features/admin_panel/presentation/bloc/admin_analytics/admin_analytics_bloc.dart';
 import 'package:smart_study_plan/features/admin_panel/presentation/widgets/user_progress_card.dart';
+import 'package:smart_study_plan/core/widgets/skeletons/list_item_skeleton.dart';
 
 class AdminUserProgressPage extends StatelessWidget {
   const AdminUserProgressPage({super.key});
@@ -37,16 +38,20 @@ class _AdminUserProgressView extends StatelessWidget {
       ),
       body: BlocBuilder<AdminAnalyticsBloc, AdminAnalyticsState>(
         builder: (context, state) {
-          if (state is AdminAnalyticsInitial ||
-              state is AdminAnalyticsLoading) {
-            return const Center(child: CircularProgressIndicator());
+          if (state.status == AdminAnalyticsStatus.loading) {
+            return ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: 5,
+              separatorBuilder: (_, index) => const SizedBox(height: 12),
+              itemBuilder: (_, index) => const ListItemSkeleton(),
+            );
           }
 
-          if (state is AdminAnalyticsError) {
-            return _errorView(context, state.message);
+          if (state.status == AdminAnalyticsStatus.failure) {
+            return _errorView(context, state.errorMessage ?? 'Unknown error');
           }
 
-          if (state is AllUserProgressLoaded) {
+          if (state.status == AdminAnalyticsStatus.success) {
             if (state.usersProgress.isEmpty) {
               return _emptyView();
             }

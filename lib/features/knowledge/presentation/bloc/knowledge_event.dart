@@ -16,11 +16,13 @@ class LoadKnowledgeItemsEvent extends KnowledgeEvent {
   final String userId;
   final KnowledgeType? type;
   final String? subjectId; // ✅ ADD THIS
+  final String? query; // [NEW] Search query
 
   const LoadKnowledgeItemsEvent({
     required this.userId,
     this.type,
     this.subjectId,
+    this.query,
   });
 }
 
@@ -60,11 +62,16 @@ class DeleteKnowledgeItemEvent extends KnowledgeEvent {
 // ---------------- AI ----------------
 
 class RunAiActionEvent extends KnowledgeEvent {
+  final String userId;
   final AiActionType action;
   final String input;
 
-  const RunAiActionEvent({required this.action, required this.input});
+  const RunAiActionEvent({
+    required this.userId,
+    required this.action,
+    required this.input,
+  });
 
   @override
-  List<Object?> get props => [action, input];
+  List<Object?> get props => [userId, action, input];
 }

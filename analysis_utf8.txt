@@ -1,0 +1,7 @@
+﻿Analyzing smart_study_plan...                                   
+
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\config\theme\app_theme.dart:96:30 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\user_management\presentation\pages\splash_page.dart:83:56 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\user_management\presentation\pages\splash_page.dart:101:54 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\user_management\presentation\pages\splash_page.dart:129:58 - deprecated_member_use
+

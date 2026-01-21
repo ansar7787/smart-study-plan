@@ -18,7 +18,7 @@ class AlarmService {
   Future<bool> scheduleTaskAlarm({
     required String taskId,
     required String taskTitle,
-    // required String payload,
+    required String reminderId,
     required DateTime reminderTime,
   }) async {
     try {
@@ -58,7 +58,7 @@ class AlarmService {
   Future<bool> scheduleSessionAlarm({
     required String sessionId,
     required String sessionTitle,
-    // required String payload,
+    required String reminderId,
     required DateTime reminderTime,
   }) async {
     try {

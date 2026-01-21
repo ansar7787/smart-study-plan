@@ -22,7 +22,7 @@ class KnowledgeBloc extends Bloc<KnowledgeEvent, KnowledgeState> {
     required this.updateItem,
     required this.deleteItem,
     required this.runAiAction,
-  }) : super(KnowledgeInitial()) {
+  }) : super(const KnowledgeState()) {
     on<LoadKnowledgeItemsEvent>(_onLoad);
     on<CreateKnowledgeItemEvent>(_onCreate);
     on<UpdateKnowledgeItemEvent>(_onUpdate);
@@ -36,17 +36,37 @@ class KnowledgeBloc extends Bloc<KnowledgeEvent, KnowledgeState> {
     LoadKnowledgeItemsEvent event,
     Emitter<KnowledgeState> emit,
   ) async {
-    emit(KnowledgeLoading());
+    emit(state.copyWith(status: KnowledgeStatus.loading));
 
     final result = await getItems(event.userId, type: event.type);
 
-    result.fold((failure) => emit(KnowledgeError(failure.message)), (items) {
-      final filtered = event.subjectId == null
-          ? items
-          : items.where((e) => e.subjectId == event.subjectId).toList();
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          status: KnowledgeStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (items) {
+        var filtered = event.subjectId == null
+            ? items
+            : event.subjectId == 'UNCATEGORIZED'
+            ? items.where((e) => e.subjectId == null).toList()
+            : items.where((e) => e.subjectId == event.subjectId).toList();
 
-      emit(KnowledgeLoaded(filtered));
-    });
+        // 🔍 [NEW] Apply Search Filter
+        if (event.query != null && event.query!.isNotEmpty) {
+          final q = event.query!.toLowerCase();
+          filtered = filtered.where((e) {
+            final title = e.title.toLowerCase();
+            final content = e.content.toLowerCase();
+            return title.contains(q) || content.contains(q);
+          }).toList();
+        }
+
+        emit(state.copyWith(status: KnowledgeStatus.success, items: filtered));
+      },
+    );
   }
 
   // ---------------- CREATE ----------------
@@ -55,20 +75,28 @@ class KnowledgeBloc extends Bloc<KnowledgeEvent, KnowledgeState> {
     CreateKnowledgeItemEvent event,
     Emitter<KnowledgeState> emit,
   ) async {
-    emit(KnowledgeLoading());
+    emit(state.copyWith(status: KnowledgeStatus.loading));
 
     final result = await createItem(event.item);
 
-    result.fold((failure) => emit(KnowledgeError(failure.message)), (_) {
-      // ✅ Reload with SAME filters
-      add(
-        LoadKnowledgeItemsEvent(
-          userId: event.item.userId,
-          type: event.item.type,
-          subjectId: event.item.subjectId, // ✅ CORRECT PLACE
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          status: KnowledgeStatus.failure,
+          errorMessage: failure.message,
         ),
-      );
-    });
+      ),
+      (_) {
+        // ✅ Reload with SAME filters
+        add(
+          LoadKnowledgeItemsEvent(
+            userId: event.item.userId,
+            type: event.item.type,
+            subjectId: event.item.subjectId,
+          ),
+        );
+      },
+    );
   }
 
   // ---------------- UPDATE ----------------
@@ -77,23 +105,24 @@ class KnowledgeBloc extends Bloc<KnowledgeEvent, KnowledgeState> {
     UpdateKnowledgeItemEvent event,
     Emitter<KnowledgeState> emit,
   ) async {
-    final currentState = state;
-
     // 1️⃣ Optimistically update UI FIRST
-    if (currentState is KnowledgeLoaded) {
-      final updatedItems = currentState.items.map((item) {
-        return item.id == event.item.id ? event.item : item;
-      }).toList();
+    final updatedItems = state.items.map((item) {
+      return item.id == event.item.id ? event.item : item;
+    }).toList();
 
-      emit(KnowledgeLoaded(updatedItems));
-    }
+    emit(state.copyWith(items: updatedItems, status: KnowledgeStatus.success));
 
     // 2️⃣ Persist change
     final result = await updateItem(event.item);
 
     result.fold(
       (failure) {
-        emit(KnowledgeError(failure.message));
+        emit(
+          state.copyWith(
+            status: KnowledgeStatus.failure,
+            errorMessage: failure.message,
+          ),
+        );
       },
       (_) {
         // ✅ Do NOTHING here — UI already updated
@@ -107,23 +136,21 @@ class KnowledgeBloc extends Bloc<KnowledgeEvent, KnowledgeState> {
     DeleteKnowledgeItemEvent event,
     Emitter<KnowledgeState> emit,
   ) async {
-    final currentState = state;
-
     // 1️⃣ Optimistically update UI
-    if (currentState is KnowledgeLoaded) {
-      final updatedItems = currentState.items
-          .where((e) => e.id != event.id)
-          .toList();
-
-      emit(KnowledgeLoaded(updatedItems));
-    }
+    final updatedItems = state.items.where((e) => e.id != event.id).toList();
+    emit(state.copyWith(items: updatedItems, status: KnowledgeStatus.success));
 
     // 2️⃣ Persist deletion
     final result = await deleteItem(event.id);
 
     result.fold(
       (failure) {
-        emit(KnowledgeError(failure.message));
+        emit(
+          state.copyWith(
+            status: KnowledgeStatus.failure,
+            errorMessage: failure.message,
+          ),
+        );
       },
       (_) {
         // ✅ UI already updated — do nothing
@@ -137,13 +164,23 @@ class KnowledgeBloc extends Bloc<KnowledgeEvent, KnowledgeState> {
     RunAiActionEvent event,
     Emitter<KnowledgeState> emit,
   ) async {
-    emit(AiActionRunning());
+    emit(state.copyWith(aiStatus: AiStatus.loading));
 
-    final result = await runAiAction(action: event.action, input: event.input);
+    final result = await runAiAction(
+      userId: event.userId,
+      action: event.action,
+      input: event.input,
+    );
 
     result.fold(
-      (failure) => emit(KnowledgeError(failure.message)),
-      (output) => emit(AiActionCompleted(output)),
+      (failure) => emit(
+        state.copyWith(
+          aiStatus: AiStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (output) =>
+          emit(state.copyWith(aiStatus: AiStatus.success, aiResult: output)),
     );
   }
 }

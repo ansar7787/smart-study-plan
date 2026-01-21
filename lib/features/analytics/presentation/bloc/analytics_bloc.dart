@@ -17,7 +17,7 @@ class AnalyticsBloc extends Bloc<AnalyticsEvent, AnalyticsState> {
     required this.createGoal,
     required this.updateGoal,
     required this.deleteGoal,
-  }) : super(AnalyticsInitial()) {
+  }) : super(const AnalyticsState()) {
     on<LoadAnalyticsEvent>(_onLoadAnalytics);
     on<CreateStudyGoalEvent>(_onCreateGoal);
     on<UpdateStudyGoalEvent>(_onUpdateGoal);
@@ -28,7 +28,7 @@ class AnalyticsBloc extends Bloc<AnalyticsEvent, AnalyticsState> {
     LoadAnalyticsEvent event,
     Emitter<AnalyticsState> emit,
   ) async {
-    emit(AnalyticsLoading());
+    emit(state.copyWith(status: AnalyticsStatus.loading));
 
     final result = await loadOverview(
       LoadAnalyticsOverviewParams(
@@ -39,8 +39,15 @@ class AnalyticsBloc extends Bloc<AnalyticsEvent, AnalyticsState> {
     );
 
     result.fold(
-      (failure) => emit(AnalyticsError(failure.message)),
-      (overview) => emit(AnalyticsLoaded(overview)),
+      (failure) => emit(
+        state.copyWith(
+          status: AnalyticsStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (overview) => emit(
+        state.copyWith(status: AnalyticsStatus.success, overview: overview),
+      ),
     );
   }
 
@@ -48,12 +55,14 @@ class AnalyticsBloc extends Bloc<AnalyticsEvent, AnalyticsState> {
     CreateStudyGoalEvent event,
     Emitter<AnalyticsState> emit,
   ) async {
+    emit(state.copyWith(status: AnalyticsStatus.loading));
+
     final result = await createGoal(
       CreateStudyGoalParams(
         userId: event.userId,
         title: event.title,
         description: event.description,
-        metricType: event.metricType, // ✅ FIXED
+        metricType: event.metricType,
         targetValue: event.targetValue,
         startDate: event.startDate,
         endDate: event.endDate,
@@ -61,8 +70,13 @@ class AnalyticsBloc extends Bloc<AnalyticsEvent, AnalyticsState> {
     );
 
     result.fold(
-      (failure) => emit(AnalyticsError(failure.message)),
-      (_) => emit(AnalyticsActionSuccess()),
+      (failure) => emit(
+        state.copyWith(
+          status: AnalyticsStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (_) => add(LoadAnalyticsEvent(userId: event.userId)), // Reload
     );
   }
 
@@ -70,11 +84,18 @@ class AnalyticsBloc extends Bloc<AnalyticsEvent, AnalyticsState> {
     UpdateStudyGoalEvent event,
     Emitter<AnalyticsState> emit,
   ) async {
-    final result = await updateGoal(event.goal); // ✅ FIXED
+    emit(state.copyWith(status: AnalyticsStatus.loading));
+
+    final result = await updateGoal(event.goal);
 
     result.fold(
-      (failure) => emit(AnalyticsError(failure.message)),
-      (_) => emit(AnalyticsActionSuccess()),
+      (failure) => emit(
+        state.copyWith(
+          status: AnalyticsStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (_) => add(LoadAnalyticsEvent(userId: event.goal.userId)), // Reload
     );
   }
 
@@ -82,11 +103,24 @@ class AnalyticsBloc extends Bloc<AnalyticsEvent, AnalyticsState> {
     DeleteStudyGoalEvent event,
     Emitter<AnalyticsState> emit,
   ) async {
+    // Optimistic/Loading
+    emit(state.copyWith(status: AnalyticsStatus.loading));
+
+    // Note: To implement optimistic delete, we'd need to manually remove from overview.activeGoals logic here.
+    // For now, reload is acceptable for MVP compliance or I can make it optimistic if I parse overview.
+
     final result = await deleteGoal(event.goalId);
 
     result.fold(
-      (failure) => emit(AnalyticsError(failure.message)),
-      (_) => emit(AnalyticsActionSuccess()),
+      (failure) => emit(
+        state.copyWith(
+          status: AnalyticsStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (_) {
+        add(LoadAnalyticsEvent(userId: event.userId));
+      },
     );
   }
 }

@@ -17,9 +17,9 @@ class HomeProgressCard extends StatelessWidget {
         int total = 0;
         int done = 0;
 
-        if (state is AnalyticsLoaded) {
-          total = state.overview.snapshot.totalTasks;
-          done = state.overview.snapshot.completedTasks;
+        if (state.overview != null) {
+          total = state.overview!.todaySnapshot.totalTasks;
+          done = state.overview!.todaySnapshot.completedTasks;
         }
 
         final progress = total == 0 ? 0.0 : done / total;

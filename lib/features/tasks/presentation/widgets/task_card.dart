@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../domain/entities/task.dart';
 
-class TaskCard extends StatelessWidget {
+class TaskCard extends StatefulWidget {
   final Task task;
   final VoidCallback onToggle;
   final VoidCallback onEdit;
@@ -21,12 +22,68 @@ class TaskCard extends StatelessWidget {
   });
 
   @override
+  State<TaskCard> createState() => _TaskCardState();
+}
+
+class _TaskCardState extends State<TaskCard> {
+  late Timer _timer;
+  late DateTime _now;
+
+  @override
+  void initState() {
+    super.initState();
+    _now = DateTime.now();
+    _timer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      if (!mounted) return;
+      setState(() {
+        _now = DateTime.now();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  String _getCountdown() {
+    if (widget.task.isCompleted) return 'Completed';
+
+    final start = widget.task.startDate ?? widget.task.createdAt;
+    final end = widget.task.dueDate;
+
+    if (_now.isBefore(start)) {
+      final diff = start.difference(_now);
+      return 'Starts in: ${_formatDuration(diff)}';
+    } else if (_now.isBefore(end)) {
+      final diff = end.difference(_now);
+      return 'Time Left: ${_formatDuration(diff)}';
+    } else {
+      return 'Overdue';
+    }
+  }
+
+  String _formatDuration(Duration d) {
+    if (d.inDays > 0) {
+      return '${d.inDays}d ${d.inHours % 24}h';
+    } else if (d.inHours > 0) {
+      return '${d.inHours}h ${d.inMinutes % 60}m';
+    } else {
+      return '${d.inMinutes}m';
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final statusColor = _statusColor(theme);
+    final countdownText = _getCountdown();
+    final start = widget.task.startDate ?? widget.task.createdAt;
+    final isLocked = _now.isBefore(start) && !widget.task.isCompleted;
 
     return Dismissible(
-      key: ValueKey(task.id),
+      key: ValueKey(widget.task.id),
       direction: DismissDirection.endToStart,
       background: const SizedBox(),
       secondaryBackground: _SwipeAction(
@@ -35,44 +92,80 @@ class TaskCard extends StatelessWidget {
         label: 'Delete',
       ),
       confirmDismiss: (_) async {
-        onDelete.call();
+        widget.onDelete.call();
         return true;
       },
       child: InkWell(
-        onTap: onEdit,
-        borderRadius: BorderRadius.circular(18),
+        onTap: widget.onEdit,
+        borderRadius: BorderRadius.circular(20),
         child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          padding: const EdgeInsets.all(14),
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: theme.colorScheme.shadow.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
             border: Border.all(
-              color: theme.dividerColor.withValues(alpha: 0.4),
+              color: theme.dividerColor.withValues(alpha: 0.2),
             ),
           ),
           child: Row(
             children: [
-              // ✅ TOGGLE (COMPLETE / UNCOMPLETE)
-              GestureDetector(
-                onTap: onToggle,
-                child: Container(
-                  width: 26,
-                  height: 26,
+              // ✅ CUSTOM CHECKBOX
+              InkWell(
+                onTap: () {
+                  if (isLocked) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Cannot complete task before it starts!'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                    return;
+                  }
+                  widget.onToggle();
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 28,
+                  height: 28,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: task.isCompleted
+                    borderRadius: BorderRadius.circular(8),
+                    color: widget.task.isCompleted
                         ? theme.colorScheme.primary
-                        : Colors.transparent,
-                    border: Border.all(color: statusColor, width: 2),
+                        : (isLocked
+                              ? theme.disabledColor.withValues(alpha: 0.1)
+                              : Colors.transparent),
+                    border: Border.all(
+                      color: widget.task.isCompleted
+                          ? theme.colorScheme.primary
+                          : (isLocked
+                                ? theme.disabledColor.withValues(alpha: 0.3)
+                                : theme.colorScheme.outline.withValues(
+                                    alpha: 0.5,
+                                  )),
+                      width: 2,
+                    ),
                   ),
-                  child: task.isCompleted
-                      ? const Icon(Icons.check, size: 16, color: Colors.white)
-                      : null,
+                  child: widget.task.isCompleted
+                      ? const Icon(Icons.check, size: 18, color: Colors.white)
+                      : (isLocked
+                            ? Icon(
+                                Icons.lock,
+                                size: 14,
+                                color: theme.disabledColor,
+                              )
+                            : null),
                 ),
               ),
-
-              const SizedBox(width: 14),
+              const SizedBox(width: 16),
 
               // 📄 CONTENT
               Expanded(
@@ -80,50 +173,95 @@ class TaskCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      task.title,
+                      widget.task.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        decoration: task.isCompleted
+                        fontWeight: FontWeight.bold,
+                        decoration: widget.task.isCompleted
                             ? TextDecoration.lineThrough
                             : null,
+                        color: widget.task.isCompleted
+                            ? theme.colorScheme.onSurface.withValues(alpha: 0.5)
+                            : theme.colorScheme.onSurface,
                       ),
+                    ),
+                    const SizedBox(height: 4),
+
+                    // Countdowns Row
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.timer_outlined,
+                          size: 14,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          countdownText,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme
+                                .colorScheme
+                                .primary, // Highlight countdown
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
 
                     const SizedBox(height: 6),
 
-                    Text(
-                      'Due • ${DateFormat('MMM d, h:mm a').format(task.dueDate)}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: _isOverdue
-                            ? Colors.red
-                            : theme.colorScheme.onSurface.withValues(
-                                alpha: 0.6,
-                              ),
-                      ),
+                    // Times
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Start: ${DateFormat('MMM d, h:mm a').format(start.toLocal())}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.7),
+                            fontSize: 11,
+                          ),
+                        ),
+                        Text(
+                          'End:   ${DateFormat('MMM d, h:mm a').format(widget.task.dueDate.toLocal())}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: _isOverdue
+                                ? theme.colorScheme.error
+                                : theme.colorScheme.onSurfaceVariant.withValues(
+                                    alpha: 0.7,
+                                  ),
+                            fontWeight: _isOverdue
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
                     ),
-
-                    const SizedBox(height: 10),
-
+                    const SizedBox(height: 8),
                     _StatusChip(label: _statusText, color: statusColor),
                   ],
                 ),
               ),
 
               // 🔔 REMINDER BUTTON
-              IconButton(
-                tooltip: hasReminder ? 'Reminder already set' : 'Add reminder',
-                icon: Icon(
-                  hasReminder
-                      ? Icons.notifications_active
-                      : Icons.notifications_none,
-                  color: hasReminder
-                      ? theme.colorScheme.primary
-                      : theme.iconTheme.color,
+              if (!widget.task.isCompleted)
+                IconButton(
+                  tooltip: widget.hasReminder ? 'Reminder set' : 'Add reminder',
+                  icon: Icon(
+                    widget.hasReminder
+                        ? Icons.notifications_active
+                        : Icons.notifications_outlined,
+                    color: widget.hasReminder
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.6,
+                          ),
+                    size: 20,
+                  ),
+                  onPressed: widget.hasReminder ? null : widget.onAddReminder,
                 ),
-                onPressed: hasReminder ? null : onAddReminder,
-              ),
             ],
           ),
         ),
@@ -136,16 +274,16 @@ class TaskCard extends StatelessWidget {
   // ---------------------------------------------------------------------------
 
   bool get _isOverdue =>
-      task.dueDate.isBefore(DateTime.now()) && !task.isCompleted;
+      widget.task.dueDate.isBefore(DateTime.now()) && !widget.task.isCompleted;
 
   String get _statusText {
-    if (task.isCompleted) return 'Completed';
+    if (widget.task.isCompleted) return 'Completed';
     if (_isOverdue) return 'Overdue';
     return 'Pending';
   }
 
   Color _statusColor(ThemeData theme) {
-    if (task.isCompleted) return theme.disabledColor;
+    if (widget.task.isCompleted) return theme.disabledColor;
     if (_isOverdue) return Colors.red;
     return theme.colorScheme.primary;
   }

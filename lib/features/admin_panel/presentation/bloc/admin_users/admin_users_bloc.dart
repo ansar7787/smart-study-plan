@@ -16,7 +16,7 @@ class AdminUsersBloc extends Bloc<AdminUsersEvent, AdminUsersState> {
   AdminUsersBloc({
     required this.getAllUsersUseCase,
     required this.deleteUserAdminUseCase,
-  }) : super(const UsersInitial()) {
+  }) : super(const AdminUsersState()) {
     on<FetchUsersEvent>(_onFetchUsers);
     on<RefreshUsersEvent>(_onRefreshUsers);
     on<FetchUsersByRoleEvent>(_onFetchUsersByRole);
@@ -28,17 +28,22 @@ class AdminUsersBloc extends Bloc<AdminUsersEvent, AdminUsersState> {
     FetchUsersEvent event,
     Emitter<AdminUsersState> emit,
   ) async {
-    emit(const UsersLoading());
+    emit(state.copyWith(status: AdminUsersStatus.loading));
 
     final result = await getAllUsersUseCase(const NoParams());
 
     result.fold(
       (failure) {
         AppLogger.e('Fetch users failed: ${failure.message}');
-        emit(UsersError(failure.message));
+        emit(
+          state.copyWith(
+            status: AdminUsersStatus.failure,
+            errorMessage: failure.message,
+          ),
+        );
       },
       (users) {
-        emit(UsersLoaded(users));
+        emit(state.copyWith(status: AdminUsersStatus.success, users: users));
       },
     );
   }
@@ -54,52 +59,87 @@ class AdminUsersBloc extends Bloc<AdminUsersEvent, AdminUsersState> {
     FetchUsersByRoleEvent event,
     Emitter<AdminUsersState> emit,
   ) async {
-    emit(const UsersLoading());
+    emit(state.copyWith(status: AdminUsersStatus.loading));
 
     final result = await getAllUsersUseCase(const NoParams());
 
-    result.fold((failure) => emit(UsersError(failure.message)), (users) {
-      final filtered = users.where((u) => u.role == event.role).toList();
-      emit(UsersLoaded(filtered));
-    });
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          status: AdminUsersStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (users) {
+        final filtered = users.where((u) => u.role == event.role).toList();
+        emit(state.copyWith(status: AdminUsersStatus.success, users: filtered));
+      },
+    );
   }
 
   Future<void> _onSearchUsers(
     SearchUsersEvent event,
     Emitter<AdminUsersState> emit,
   ) async {
+    // If we already have users loaded, filter locally first?
+    // Ideally we might want to re-fetch if we suspect stale data, but local filter is faster.
+    // However, the original implementation fetched fresh every time. Let's optimize if possible,
+    // but sticking to fetching fresh for consistency with original logic, or better:
+    // Actually, searching should probably just filter the already loaded users if they are there?
+    // But original code called `getAllUsersUseCase`. I'll stick to that to be safe.
+
+    emit(state.copyWith(status: AdminUsersStatus.loading));
+
     final result = await getAllUsersUseCase(const NoParams());
 
-    result.fold((failure) => emit(UsersError(failure.message)), (users) {
-      final query = event.query.toLowerCase();
-      final filtered = users.where((u) {
-        return u.name.toLowerCase().contains(query) ||
-            u.email.toLowerCase().contains(query);
-      }).toList();
-      emit(UsersLoaded(filtered));
-    });
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          status: AdminUsersStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (users) {
+        final query = event.query.toLowerCase();
+        final filtered = users.where((u) {
+          return u.name.toLowerCase().contains(query) ||
+              u.email.toLowerCase().contains(query);
+        }).toList();
+        emit(state.copyWith(status: AdminUsersStatus.success, users: filtered));
+      },
+    );
   }
 
   Future<void> _onDeleteUser(
     DeleteUserEvent event,
     Emitter<AdminUsersState> emit,
   ) async {
-    final currentState = state;
-    emit(const UsersLoading());
+    // Optimistic Update
+    final previousUsers = state.users;
+    final updatedUsers = previousUsers
+        .where((u) => u.id != event.userId)
+        .toList();
+    emit(state.copyWith(users: updatedUsers));
 
     final result = await deleteUserAdminUseCase(
       DeleteUserParams(userId: event.userId),
     );
 
-    result.fold((failure) => emit(UsersError(failure.message)), (_) {
-      if (currentState is UsersLoaded) {
-        final updated = currentState.users
-            .where((u) => u.id != event.userId)
-            .toList();
-        emit(UsersLoaded(updated));
-      } else {
-        add(const FetchUsersEvent());
-      }
-    });
+    result.fold(
+      (failure) {
+        // Revert
+        emit(
+          state.copyWith(
+            status: AdminUsersStatus.failure,
+            errorMessage: failure.message,
+            users: previousUsers,
+          ),
+        );
+      },
+      (_) {
+        // Success confirm
+        emit(state.copyWith(status: AdminUsersStatus.success));
+      },
+    );
   }
 }

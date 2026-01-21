@@ -10,6 +10,8 @@ extension KnowledgeTypeUI on KnowledgeType {
         return 'Summary';
       case KnowledgeType.idea:
         return 'Idea';
+      case KnowledgeType.session:
+        return 'Session';
     }
   }
 
@@ -21,6 +23,8 @@ extension KnowledgeTypeUI on KnowledgeType {
         return Icons.summarize_rounded;
       case KnowledgeType.idea:
         return Icons.lightbulb_rounded;
+      case KnowledgeType.session:
+        return Icons.timer_outlined;
     }
   }
 
@@ -32,6 +36,8 @@ extension KnowledgeTypeUI on KnowledgeType {
         return Colors.green;
       case KnowledgeType.idea:
         return Colors.orange;
+      case KnowledgeType.session:
+        return Colors.purple;
     }
   }
 }

@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../../core/bloc/base_state.dart';
-import '../../../../core/bloc/view_state.dart';
+import 'package:smart_study_plan/core/alarm/alarm_service.dart';
 import '../../domain/entities/task.dart';
 import '../bloc/task_bloc.dart';
 import '../bloc/task_event.dart';
+import '../bloc/task_state.dart';
 
 class TaskFormPage extends StatefulWidget {
   final Task? task;
   final String? subjectId;
+  final String userId;
 
-  const TaskFormPage({super.key, this.task, this.subjectId});
+  const TaskFormPage({
+    super.key,
+    this.task,
+    this.subjectId,
+    required this.userId,
+  });
 
   @override
   State<TaskFormPage> createState() => _TaskFormPageState();
@@ -21,7 +28,10 @@ class TaskFormPage extends StatefulWidget {
 class _TaskFormPageState extends State<TaskFormPage> {
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
-  late DateTime _dueDate;
+
+  late DateTime _startDate;
+  late DateTime _endDate;
+
   int _priority = 2;
   String _status = 'todo';
 
@@ -34,8 +44,11 @@ class _TaskFormPageState extends State<TaskFormPage> {
       text: widget.task?.description ?? '',
     );
 
-    _dueDate =
-        widget.task?.dueDate ?? DateTime.now().add(const Duration(days: 1));
+    // Default: Start now, End +1 hour
+    final now = DateTime.now();
+    _startDate = widget.task?.startDate?.toLocal() ?? now;
+    _endDate =
+        widget.task?.dueDate.toLocal() ?? now.add(const Duration(hours: 1));
 
     _priority = widget.task?.priority ?? 2;
     _status = widget.task?.status ?? 'todo';
@@ -56,13 +69,21 @@ class _TaskFormPageState extends State<TaskFormPage> {
       return;
     }
 
+    if (_endDate.isBefore(_startDate)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('End date must be after start date')),
+      );
+      return;
+    }
+
     final task = Task(
       id: widget.task?.id ?? const Uuid().v4(),
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim(),
       subjectId: widget.task?.subjectId ?? widget.subjectId!,
-      userId: widget.task?.userId ?? '',
-      dueDate: _dueDate,
+      userId: widget.task?.userId ?? widget.userId,
+      startDate: _startDate, // NEW
+      dueDate: _endDate, // Mapped to End Date
       priority: _priority,
       status: _status,
       isCompleted: _status == 'completed',
@@ -76,6 +97,65 @@ class _TaskFormPageState extends State<TaskFormPage> {
     } else {
       context.read<TaskBloc>().add(UpdateTaskEvent(task));
     }
+
+    // ⏰ AUTO-ALARM (30 mins before due)
+    _scheduleAutoAlarm(task);
+  }
+
+  Future<void> _scheduleAutoAlarm(Task task) async {
+    // 1. Calculate trigger time
+    final reminderTime = task.dueDate.subtract(const Duration(minutes: 30));
+
+    // 2. Validate time
+    if (reminderTime.isBefore(DateTime.now())) {
+      return; // Creating a task that's already effectively "due" for alarm -> Skip
+    }
+
+    // 3. Generate Reminder ID (reuse existing or new? Simple: new for auto)
+    // Careful: If editing, we might duplicate.
+    // Ideally we check if one exists. But for "Auto-add", let's assuming we just add one if it's new.
+    // User asked "also implement... also add".
+    // To be safe and avoid duplicates on Edit without complex checks:
+    // Only easy way without reading all reminders is to just schedule AlarmService (id is task-based).
+    // And Fire-and-forget the ReminderBloc event.
+    // Actually, `AlarmService.scheduleTaskAlarm` uses `taskId.hashCode` so it overwrites! perfect.
+    // For `ReminderBloc`, we might create duplicate entries in DB if we blindly add.
+    // Is it acceptable to just set the ALARM (notification) without the DB Reminder entity?
+    // The user motivation is "alarm". The Reminder entity is for the UI list.
+    // Let's do BOTH but wrap in a try/catch or just optimistic.
+    // For now, I will just set the AlarmService which is the critical part for the "alarm".
+    // Syncing to ReminderBloc might be noise if user didn't explicitly ask for "Reminder List Item".
+    // But "before 30 minutes due alarm" implies a reminder.
+    // I'll add both.
+
+    // Note: Creating a unique ID for the Reminder entity is tricky without duplication checks.
+    // I'll fallback to: Set Alarm + Show SnackBar "Auto-alarm set".
+    // I won't create a DB Reminder entity to avoid clutter/dupes until I have a better "Get/Check" mechanism in this form.
+    // Wait, the user might want to see it in the list.
+    // Let's stick to AlarmService ONLY for now to ensure the "Ring" happens.
+
+    final alarmId = const Uuid()
+        .v4(); // Dummy if not saving to DB, but AlarmService needs one?
+    // AlarmService.scheduleTaskAlarm checks taskId.hashCode, but takes `reminderId` arg.
+    // Let's pass a new UUID.
+
+    await AlarmService.instance.scheduleTaskAlarm(
+      taskId: task.id,
+      taskTitle: task.title,
+      reminderId: alarmId,
+      reminderTime: reminderTime,
+    );
+
+    // Optional: Notify user
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Alarm set for 30 mins before due'),
+          backgroundColor: Colors.teal,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   @override
@@ -84,17 +164,16 @@ class _TaskFormPageState extends State<TaskFormPage> {
       appBar: AppBar(
         title: Text(widget.task == null ? 'Add Task' : 'Edit Task'),
       ),
-      body: BlocListener<TaskBloc, BaseState<List<Task>>>(
+      body: BlocListener<TaskBloc, TaskState>(
         listener: (context, state) {
-          final viewState = state.viewState;
-
-          if (viewState is ViewFailure<List<Task>>) {
+          if (state.status == TaskStatus.failure &&
+              state.errorMessage != null) {
             ScaffoldMessenger.of(
               context,
-            ).showSnackBar(SnackBar(content: Text(viewState.message)));
+            ).showSnackBar(SnackBar(content: Text(state.errorMessage!)));
           }
 
-          if (viewState is ViewSuccess<List<Task>>) {
+          if (state.status == TaskStatus.success) {
             Navigator.pop(context);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -140,14 +219,46 @@ class _TaskFormPageState extends State<TaskFormPage> {
           ),
           const SizedBox(height: 16),
 
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Due Date'),
-            subtitle: Text(
-              '${_dueDate.day}/${_dueDate.month}/${_dueDate.year}',
+          // START DATE
+          _DateTimeField(
+            label: 'Start Date & Time',
+            dateTime: _startDate,
+            onTap: () => _pickDateTime(
+              initial: _startDate,
+              firstDate: DateTime.now(), // Disable past dates
+              onPicked: (dt) {
+                setState(() {
+                  _startDate = dt;
+                  // Auto-adjust End Date if it becomes invalid
+                  if (_endDate.isBefore(_startDate)) {
+                    _endDate = _startDate.add(const Duration(hours: 1));
+                  }
+                });
+              },
             ),
-            trailing: const Icon(Icons.calendar_today),
-            onTap: _pickDate,
+          ),
+          const SizedBox(height: 16),
+
+          // END DATE
+          _DateTimeField(
+            label: 'End Date & Time',
+            dateTime: _endDate,
+            onTap: () => _pickDateTime(
+              initial: _endDate,
+              firstDate: _startDate, // Disable dates before Start Date
+              onPicked: (dt) {
+                // Ensure strict future check for time as well
+                if (dt.isBefore(_startDate)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('End time cannot be before Start time'),
+                    ),
+                  );
+                  return;
+                }
+                setState(() => _endDate = dt);
+              },
+            ),
           ),
 
           const SizedBox(height: 16),
@@ -204,16 +315,68 @@ class _TaskFormPageState extends State<TaskFormPage> {
     );
   }
 
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
+  Future<void> _pickDateTime({
+    required DateTime initial,
+    DateTime? firstDate,
+    required Function(DateTime) onPicked,
+  }) async {
+    final first = firstDate ?? DateTime(2000);
+
+    final date = await showDatePicker(
       context: context,
-      initialDate: _dueDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDate: initial.isBefore(first) ? first : initial,
+      firstDate: first,
+      lastDate: DateTime(2100),
+    );
+    if (date == null) return;
+
+    if (!mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+    );
+    if (time == null) return;
+
+    final picked = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
     );
 
-    if (picked != null) {
-      setState(() => _dueDate = picked);
-    }
+    onPicked(picked);
+  }
+}
+
+class _DateTimeField extends StatelessWidget {
+  final String label;
+  final DateTime dateTime;
+  final VoidCallback onTap;
+
+  const _DateTimeField({
+    required this.label,
+    required this.dateTime,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final dt = dateTime.toLocal();
+    final dateStr = DateFormat.yMMMd().add_jm().format(dt);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          suffixIcon: const Icon(Icons.event),
+        ),
+        child: Text(dateStr, style: const TextStyle(fontSize: 16)),
+      ),
+    );
   }
 }

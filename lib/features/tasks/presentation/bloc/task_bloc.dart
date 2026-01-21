@@ -1,119 +1,173 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-
-import 'package:smart_study_plan/core/bloc/base_bloc.dart';
-import 'package:smart_study_plan/core/bloc/base_state.dart';
-import 'package:smart_study_plan/core/bloc/view_state.dart';
-
 import '../../domain/entities/task.dart';
 import '../../domain/usecases/create_task.dart';
 import '../../domain/usecases/update_task.dart';
 import '../../domain/usecases/delete_task.dart';
 import '../../domain/usecases/get_tasks_by_subject.dart';
+import '../../domain/usecases/get_tasks_by_user.dart';
 
 import 'task_event.dart';
+import 'task_state.dart';
 
-class TaskBloc extends BaseBloc<TaskEvent, List<Task>> {
+class TaskBloc extends Bloc<TaskEvent, TaskState> {
   final GetTasksBySubjectUsecase getTasksBySubjectUsecase;
+  final GetTasksByUserUsecase getTasksByUserUsecase;
   final CreateTaskUsecase createTaskUsecase;
   final UpdateTaskUsecase updateTaskUsecase;
   final DeleteTaskUsecase deleteTaskUsecase;
 
   TaskBloc({
     required this.getTasksBySubjectUsecase,
+    required this.getTasksByUserUsecase,
     required this.createTaskUsecase,
     required this.updateTaskUsecase,
     required this.deleteTaskUsecase,
-  }) : super(BaseState.initial()) {
+  }) : super(const TaskState()) {
     on<LoadTasksBySubjectEvent>(_onLoadTasks);
+    on<LoadTasksByUserEvent>(_onLoadTasksByUser);
     on<CreateTaskEvent>(_onCreateTask);
     on<UpdateTaskEvent>(_onUpdateTask);
     on<ToggleTaskEvent>(_onToggleTask);
     on<DeleteTaskEvent>(_onDeleteTask);
   }
 
-  // ---------------- HELPERS ----------------
-
-  List<Task> _currentTasks() {
-    final viewState = state.viewState;
-    if (viewState is ViewSuccess<List<Task>>) {
-      return viewState.data;
-    }
-    return [];
-  }
-
-  // ---------------- LOAD ----------------
-
   Future<void> _onLoadTasks(
     LoadTasksBySubjectEvent event,
-    Emitter<BaseState<List<Task>>> emit,
+    Emitter<TaskState> emit,
   ) async {
-    emitLoading(emit);
+    emit(state.copyWith(status: TaskStatus.loading));
 
     final result = await getTasksBySubjectUsecase(
-      GetTasksParams(subjectId: event.subjectId),
+      GetTasksParams(subjectId: event.subjectId, userId: event.userId),
     );
 
     result.fold(
-      (failure) => emitFailure(emit, failure),
-      (tasks) => emitSuccess(emit, tasks),
+      (failure) => emit(
+        state.copyWith(
+          status: TaskStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (tasks) => emit(state.copyWith(status: TaskStatus.success, tasks: tasks)),
     );
   }
 
-  // ---------------- CREATE ----------------
+  Future<void> _onLoadTasksByUser(
+    LoadTasksByUserEvent event,
+    Emitter<TaskState> emit,
+  ) async {
+    emit(state.copyWith(status: TaskStatus.loading));
+
+    final result = await getTasksByUserUsecase(event.userId);
+
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          status: TaskStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (tasks) => emit(state.copyWith(status: TaskStatus.success, tasks: tasks)),
+    );
+  }
 
   Future<void> _onCreateTask(
     CreateTaskEvent event,
-    Emitter<BaseState<List<Task>>> emit,
+    Emitter<TaskState> emit,
   ) async {
+    emit(state.copyWith(status: TaskStatus.loading));
+
     final result = await createTaskUsecase(CreateTaskParams(task: event.task));
 
-    result.fold((failure) => emitFailure(emit, failure), (_) {
-      add(LoadTasksBySubjectEvent(event.task.subjectId));
-    });
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          status: TaskStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (_) => add(
+        LoadTasksBySubjectEvent(
+          subjectId: event.task.subjectId,
+          userId: event.task.userId,
+        ),
+      ),
+    );
   }
-
-  // ---------------- UPDATE ----------------
 
   Future<void> _onUpdateTask(
     UpdateTaskEvent event,
-    Emitter<BaseState<List<Task>>> emit,
+    Emitter<TaskState> emit,
   ) async {
+    emit(state.copyWith(status: TaskStatus.loading));
+
     final result = await updateTaskUsecase(UpdateTaskParams(task: event.task));
 
     result.fold(
-      (failure) => emitFailure(emit, failure),
-      (_) => add(LoadTasksBySubjectEvent(event.task.subjectId)),
+      (failure) => emit(
+        state.copyWith(
+          status: TaskStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (_) => add(
+        LoadTasksBySubjectEvent(
+          subjectId: event.task.subjectId,
+          userId: event.task.userId,
+        ),
+      ),
     );
   }
-
-  // ---------------- TOGGLE (FIXED) ----------------
 
   Future<void> _onToggleTask(
     ToggleTaskEvent event,
-    Emitter<BaseState<List<Task>>> emit,
+    Emitter<TaskState> emit,
   ) async {
     final updated = event.task.copyWith(isCompleted: !event.task.isCompleted);
+    final currentTasks = List<Task>.from(state.tasks);
 
-    final tasks = _currentTasks();
+    // Optimistic Update
+    final index = currentTasks.indexWhere((t) => t.id == updated.id);
+    if (index != -1) {
+      currentTasks[index] = updated;
+      emit(state.copyWith(status: TaskStatus.success, tasks: currentTasks));
+    }
 
-    emitSuccess(
-      emit,
-      tasks.map((t) => t.id == updated.id ? updated : t).toList(),
+    // Call API (silent update unless failure)
+    final result = await updateTaskUsecase(UpdateTaskParams(task: updated));
+
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          status: TaskStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (_) {}, // Success, already updated
     );
-
-    await updateTaskUsecase(UpdateTaskParams(task: updated));
   }
-
-  // ---------------- DELETE (FIXED) ----------------
 
   Future<void> _onDeleteTask(
     DeleteTaskEvent event,
-    Emitter<BaseState<List<Task>>> emit,
+    Emitter<TaskState> emit,
   ) async {
-    final tasks = _currentTasks();
+    final currentTasks = List<Task>.from(state.tasks);
 
-    emitSuccess(emit, tasks.where((t) => t.id != event.id).toList());
+    // Optimistic Update
+    currentTasks.removeWhere((t) => t.id == event.id);
+    emit(state.copyWith(status: TaskStatus.success, tasks: currentTasks));
 
-    await deleteTaskUsecase(DeleteTaskParams(id: event.id));
+    final result = await deleteTaskUsecase(DeleteTaskParams(id: event.id));
+
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          // Revert or show error
+          status: TaskStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (_) {},
+    );
   }
 }

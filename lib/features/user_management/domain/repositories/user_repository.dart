@@ -19,6 +19,7 @@ abstract class UserRepository {
   Future<Either<Failure, User>> loginUser({
     required String email,
     required String password,
+    String? googleIdToken,
   });
 
   Future<Either<Failure, void>> logoutUser();

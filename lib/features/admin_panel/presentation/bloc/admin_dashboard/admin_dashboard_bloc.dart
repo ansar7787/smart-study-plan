@@ -13,7 +13,7 @@ class AdminDashboardBloc
   final GetAdminStatsUseCase getAdminStatsUseCase;
 
   AdminDashboardBloc({required this.getAdminStatsUseCase})
-    : super(const AdminDashboardInitial()) {
+    : super(const AdminDashboardState()) {
     on<LoadAdminDashboardEvent>(_onLoadDashboard);
     on<RefreshAdminDashboardEvent>(_onRefreshDashboard);
   }
@@ -22,17 +22,24 @@ class AdminDashboardBloc
     LoadAdminDashboardEvent event,
     Emitter<AdminDashboardState> emit,
   ) async {
-    emit(const AdminDashboardLoading());
+    emit(state.copyWith(status: AdminDashboardStatus.loading));
 
     final result = await getAdminStatsUseCase(const NoParams());
 
     result.fold(
       (failure) {
         AppLogger.e('Admin dashboard load failed: ${failure.message}');
-        emit(AdminDashboardError(failure.message));
+        emit(
+          state.copyWith(
+            status: AdminDashboardStatus.failure,
+            errorMessage: failure.message,
+          ),
+        );
       },
       (stats) {
-        emit(AdminDashboardLoaded(stats));
+        emit(
+          state.copyWith(status: AdminDashboardStatus.success, stats: stats),
+        );
       },
     );
   }

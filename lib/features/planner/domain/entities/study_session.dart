@@ -14,6 +14,8 @@ class StudySession extends Equatable {
   final String? recurrencePattern; // daily|weekly|monthly
   final DateTime createdAt;
   final DateTime updatedAt;
+  final int? actualDuration; // Seconds
+  final bool isCompleted;
 
   const StudySession({
     required this.id,
@@ -29,6 +31,8 @@ class StudySession extends Equatable {
     this.recurrencePattern,
     required this.createdAt,
     required this.updatedAt,
+    this.actualDuration,
+    this.isCompleted = false,
   });
 
   Duration get duration => endTime.difference(startTime);
@@ -56,6 +60,8 @@ class StudySession extends Equatable {
     String? recurrencePattern,
     DateTime? createdAt,
     DateTime? updatedAt,
+    int? actualDuration,
+    bool? isCompleted,
   }) {
     return StudySession(
       id: id ?? this.id,
@@ -71,6 +77,8 @@ class StudySession extends Equatable {
       recurrencePattern: recurrencePattern ?? this.recurrencePattern,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      actualDuration: actualDuration ?? this.actualDuration,
+      isCompleted: isCompleted ?? this.isCompleted,
     );
   }
 
@@ -89,5 +97,7 @@ class StudySession extends Equatable {
     recurrencePattern,
     createdAt,
     updatedAt,
+    actualDuration,
+    isCompleted,
   ];
 }

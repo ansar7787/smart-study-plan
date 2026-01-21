@@ -5,6 +5,7 @@ abstract class TaskLocalDataSource {
   Future<void> cacheTask(TaskModel taskModel);
   Future<void> deleteCachedTask(String taskId);
   Future<List<TaskModel>> getCachedTasksBySubject(String subjectId);
+  Future<List<TaskModel>> getAllCachedTasks(); // ✅ NEW
   Future<void> clearTaskCache();
 }
 
@@ -28,6 +29,12 @@ class TaskLocalDataSourceImpl implements TaskLocalDataSource {
     final box = await Hive.openBox<TaskModel>(tasksBoxName);
     return box.values.where((task) => task.subjectId == subjectId).toList()
       ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+  }
+
+  @override
+  Future<List<TaskModel>> getAllCachedTasks() async {
+    final box = await Hive.openBox<TaskModel>(tasksBoxName);
+    return box.values.toList()..sort((a, b) => a.dueDate.compareTo(b.dueDate));
   }
 
   @override

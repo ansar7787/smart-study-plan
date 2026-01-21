@@ -12,7 +12,7 @@ class AdminAnalyticsBloc
   final GetAllUserProgressUseCase getAllUserProgressUseCase;
 
   AdminAnalyticsBloc({required this.getAllUserProgressUseCase})
-    : super(const AdminAnalyticsInitial()) {
+    : super(const AdminAnalyticsState()) {
     on<LoadAllUserProgressEvent>(_onLoadAllProgress);
     on<RefreshUserProgressEvent>(_onRefreshProgress);
   }
@@ -21,13 +21,23 @@ class AdminAnalyticsBloc
     LoadAllUserProgressEvent event,
     Emitter<AdminAnalyticsState> emit,
   ) async {
-    emit(const AdminAnalyticsLoading());
+    emit(state.copyWith(status: AdminAnalyticsStatus.loading));
 
     final result = await getAllUserProgressUseCase(const NoParams());
 
     result.fold(
-      (failure) => emit(AdminAnalyticsError(failure.message)),
-      (progress) => emit(AllUserProgressLoaded(progress)),
+      (failure) => emit(
+        state.copyWith(
+          status: AdminAnalyticsStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (progress) => emit(
+        state.copyWith(
+          status: AdminAnalyticsStatus.success,
+          usersProgress: progress,
+        ),
+      ),
     );
   }
 

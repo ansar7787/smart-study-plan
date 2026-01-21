@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:smart_study_plan/core/bloc/base_state.dart';
-import 'package:smart_study_plan/core/bloc/view_state.dart';
 import 'package:smart_study_plan/features/resources/presentation/pages/resource_viewer_page.dart';
 import 'package:smart_study_plan/features/resources/presentation/pages/upload_resource_page.dart';
-import 'package:smart_study_plan/features/subjects/domain/entities/subject.dart';
 import 'package:smart_study_plan/features/subjects/presentation/bloc/subject_bloc.dart';
 import 'package:smart_study_plan/features/subjects/presentation/bloc/subject_event.dart';
 
+import 'package:smart_study_plan/core/widgets/skeletons/list_item_skeleton.dart';
 import '../../domain/entities/file_resource.dart';
 import '../bloc/resource_bloc.dart';
 import '../bloc/resource_event.dart';
+import '../bloc/resource_state.dart';
 import '../widgets/resource_item_card.dart';
 
 class ResourceLibraryPage extends StatefulWidget {
@@ -37,6 +36,8 @@ class _ResourceLibraryPageState extends State<ResourceLibraryPage> {
   void _loadResources() {
     if (_selectedSubjectId == null) {
       context.read<ResourceBloc>().add(LoadResourcesByUserEvent(widget.userId));
+    } else if (_selectedSubjectId == 'ALL') {
+      context.read<ResourceBloc>().add(LoadResourcesByUserEvent(widget.userId));
     } else {
       context.read<ResourceBloc>().add(
         LoadResourcesBySubjectEvent(_selectedSubjectId!),
@@ -58,42 +59,90 @@ class _ResourceLibraryPageState extends State<ResourceLibraryPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF6F7FB),
-      body: SafeArea(
-        child: Column(
-          children: [
-            /// 🌟 HEADER
-            _HeaderSection(onUpload: _openUpload),
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final subjectState = context.watch<SubjectBloc>().state;
 
-            /// 🧭 FILTERS
-            _FilterSection(
-              showFavoritesOnly: _showFavoritesOnly,
-              onFavoritesChanged: (v) => setState(() => _showFavoritesOnly = v),
-              selectedSubjectId: _selectedSubjectId,
-              onSubjectChanged: (id) {
-                setState(() => _selectedSubjectId = id);
-                _loadResources();
-              },
-            ),
+    // 📂 SUBJECT (FOLDER) MODE
+    final isFolderMode = _selectedSubjectId == null && !_showFavoritesOnly;
+    final isInsideFolder = _selectedSubjectId != null;
 
-            /// 📂 CONTENT
-            Expanded(
-              child: BlocBuilder<ResourceBloc, BaseState<List<FileResource>>>(
-                builder: (context, state) {
-                  final vs = state.viewState;
+    return PopScope(
+      canPop: !isInsideFolder,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        setState(() => _selectedSubjectId = null);
+        _loadResources();
+      },
+      child: Scaffold(
+        backgroundColor: colors.surface, // ✅ Theme aware
+        body: SafeArea(
+          child: Column(
+            children: [
+              /// 🌟 HEADER
+              _HeaderSection(
+                onUpload: _openUpload,
+                isFolderMode: isFolderMode,
+                selectedSubjectId: _selectedSubjectId,
+                subjectName: _selectedSubjectId == 'ALL'
+                    ? 'All Files'
+                    : subjectState.subjects
+                          .where((s) => s.id == _selectedSubjectId)
+                          .firstOrNull
+                          ?.name,
+                onBack: () {
+                  setState(() => _selectedSubjectId = null);
+                  _loadResources();
+                },
+              ),
 
-                  if (vs is ViewLoading) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
+              /// 🧭 FAVORITES TOGGLE (Only in folder mode or if favs active)
+              if (_selectedSubjectId == null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _FavoritesFilter(
+                    showFavoritesOnly: _showFavoritesOnly,
+                    onChanged: (v) => setState(() => _showFavoritesOnly = v),
+                  ),
+                ),
 
-                  if (vs is ViewFailure<List<FileResource>>) {
-                    return Center(child: Text(vs.message));
-                  }
+              const SizedBox(height: 12),
 
-                  if (vs is ViewSuccess<List<FileResource>>) {
-                    var items = vs.data;
+              /// 📂 CONTENT
+              Expanded(
+                child: BlocBuilder<ResourceBloc, ResourceState>(
+                  builder: (context, state) {
+                    // --- LOADING ---
+                    if (state.status == ResourceStatus.loading &&
+                        state.resources.isEmpty) {
+                      return ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: 4,
+                        itemBuilder: (_, index) => const ListItemSkeleton(),
+                      );
+                    }
 
+                    // --- FOLDER GRID VIEW ---
+                    if (isFolderMode) {
+                      if (subjectState.subjects.isEmpty) {
+                        return _EmptyResources(onAdd: _openUpload);
+                      }
+                      return _FolderGrid(
+                        subjects: subjectState.subjects,
+                        resources: state.resources,
+                        onFolderTap: (id) {
+                          setState(() => _selectedSubjectId = id);
+                          _loadResources();
+                        },
+                        onViewAll: () {
+                          setState(() => _selectedSubjectId = 'ALL');
+                          _loadResources();
+                        },
+                      );
+                    }
+
+                    // --- RESOURCE LIST VIEW ---
+                    var items = state.resources;
                     if (_showFavoritesOnly) {
                       items = items.where((e) => e.isFavorite).toList();
                     }
@@ -107,7 +156,6 @@ class _ResourceLibraryPageState extends State<ResourceLibraryPage> {
                       itemCount: items.length,
                       itemBuilder: (_, i) {
                         final resource = items[i];
-
                         return _SwipeDeleteWrapper(
                           resource: resource,
                           child: ResourceItemCard(
@@ -131,13 +179,11 @@ class _ResourceLibraryPageState extends State<ResourceLibraryPage> {
                         );
                       },
                     );
-                  }
-
-                  return const SizedBox();
-                },
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -146,91 +192,110 @@ class _ResourceLibraryPageState extends State<ResourceLibraryPage> {
 
 class _HeaderSection extends StatelessWidget {
   final VoidCallback onUpload;
+  final bool isFolderMode;
+  final String? selectedSubjectId;
+  final String? subjectName;
+  final VoidCallback onBack;
 
-  const _HeaderSection({required this.onUpload});
+  const _HeaderSection({
+    required this.onUpload,
+    required this.isFolderMode,
+    required this.selectedSubjectId,
+    this.subjectName,
+    required this.onBack,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Your Resources',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          Text(
-            'Store PDFs, images & notes',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: Colors.grey.shade600,
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          /// 🚀 UPLOAD CARD
-          InkWell(
-            borderRadius: BorderRadius.circular(20),
-            onTap: onUpload,
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    theme.colorScheme.primary,
-                    theme.colorScheme.primary.withValues(alpha: 0.85),
-                  ],
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (selectedSubjectId != null)
+                IconButton.filledTonal(
+                  onPressed: onBack,
+                  icon: const Icon(Icons.arrow_back),
+                  style: IconButton.styleFrom(
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.cloud_upload_rounded,
-                    color: Colors.white,
-                    size: 32,
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      'Upload a new resource',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
+
+              if (selectedSubjectId == null)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Resources',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
+                      Text(
+                        'Manage your files',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
-                  const Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                ],
+                ),
+
+              // UPLOAD BUTTON (Small)
+              IconButton(
+                onPressed: onUpload,
+                icon: const Icon(Icons.cloud_upload_outlined),
+                style: IconButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primaryContainer,
+                  foregroundColor: theme.colorScheme.onPrimaryContainer,
+                ),
               ),
-            ),
+            ],
           ),
+
+          if (selectedSubjectId == null) ...[
+            const SizedBox(height: 16),
+            const _StorageUsageIndicator(),
+          ],
+
+          if (selectedSubjectId != null) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Icon(
+                  Icons.folder_open,
+                  size: 32,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  subjectName ?? 'Unknown Subject',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _FilterSection extends StatelessWidget {
+class _FavoritesFilter extends StatelessWidget {
   final bool showFavoritesOnly;
-  final ValueChanged<bool> onFavoritesChanged;
-  final String? selectedSubjectId;
-  final ValueChanged<String?> onSubjectChanged;
+  final ValueChanged<bool> onChanged;
 
-  const _FilterSection({
+  const _FavoritesFilter({
     required this.showFavoritesOnly,
-    required this.onFavoritesChanged,
-    required this.selectedSubjectId,
-    required this.onSubjectChanged,
+    required this.onChanged,
   });
 
   @override
@@ -238,131 +303,168 @@ class _FilterSection extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          /// ⭐ FAVORITES TOGGLE
-          InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: () => onFavoritesChanged(!showFavoritesOnly),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                color: showFavoritesOnly
-                    ? colors.primary.withValues(alpha: 0.12)
-                    : colors.surface,
-                border: Border.all(
-                  color: showFavoritesOnly
-                      ? colors.primary
-                      : colors.outline.withValues(alpha: 0.4),
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => onChanged(!showFavoritesOnly),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: showFavoritesOnly
+              ? colors.primary.withValues(alpha: 0.12)
+              : colors.surfaceContainer,
+          border: Border.all(
+            color: showFavoritesOnly
+                ? colors.primary
+                : colors.outline.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              showFavoritesOnly ? Icons.favorite : Icons.favorite_border,
+              color: showFavoritesOnly ? Colors.red : colors.onSurface,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Show favorites only',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              child: Row(
-                children: [
-                  Icon(
-                    showFavoritesOnly ? Icons.favorite : Icons.favorite_border,
-                    color: showFavoritesOnly ? Colors.red : colors.onSurface,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Show favorites only',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  Switch(
-                    value: showFavoritesOnly,
-                    onChanged: onFavoritesChanged,
-                  ),
-                ],
-              ),
             ),
-          ),
-
-          const SizedBox(height: 14),
-
-          /// 📘 SUBJECT FILTERS
-          _SubjectChips(
-            selectedId: selectedSubjectId,
-            onSelected: onSubjectChanged,
-          ),
-        ],
+            Switch(value: showFavoritesOnly, onChanged: onChanged),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _SubjectChips extends StatelessWidget {
-  final String? selectedId;
-  final ValueChanged<String?> onSelected;
+class _FolderGrid extends StatelessWidget {
+  final List<dynamic> subjects;
+  final List<FileResource> resources;
+  final ValueChanged<String> onFolderTap;
+  final VoidCallback onViewAll;
 
-  const _SubjectChips({required this.selectedId, required this.onSelected});
+  const _FolderGrid({
+    required this.subjects,
+    required this.resources,
+    required this.onFolderTap,
+    required this.onViewAll,
+  });
+
+  Color _hexToColor(String hex) {
+    try {
+      final value = hex.replaceFirst('#', '');
+      return Color(int.parse('FF$value', radix: 16));
+    } catch (_) {
+      return Colors.blue;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<SubjectBloc, BaseState<List<Subject>>>(
-      builder: (context, state) {
-        final vs = state.viewState;
-        if (vs is! ViewSuccess<List<Subject>>) return const SizedBox();
-
-        return SizedBox(
-          height: 42,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            children: [
-              _chip(
-                label: 'All',
-                selected: selectedId == null,
-                onTap: () => onSelected(null),
+    final theme = Theme.of(context);
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+        childAspectRatio: 1.1,
+      ),
+      itemCount: subjects.length + 1, // +1 for "All Files"
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return InkWell(
+            onTap: onViewAll,
+            borderRadius: BorderRadius.circular(24),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(24),
               ),
-              const SizedBox(width: 8),
-              ...vs.data.map(
-                (s) => Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: _chip(
-                    label: s.name,
-                    selected: selectedId == s.id,
-                    onTap: () => onSelected(s.id),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Icon(
+                    Icons.all_inbox_rounded,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    size: 40,
                   ),
-                ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'All Files',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                      Text(
+                        'View everything',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onPrimaryContainer
+                              .withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
+            ),
+          );
+        }
+
+        final subject = subjects[index - 1];
+        final color = _hexToColor(subject.color);
+
+        return InkWell(
+          onTap: () => onFolderTap(subject.id),
+          borderRadius: BorderRadius.circular(24),
+          child: Container(
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: color.withValues(alpha: 0.3)),
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Icon(Icons.folder_rounded, color: color, size: 40),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      subject.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${resources.where((r) => r.subjectId == subject.id).length} files',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },
-    );
-  }
-
-  Widget _chip({
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? Colors.black : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.white : Colors.black87,
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
-          ),
-        ),
-      ),
     );
   }
 }
@@ -508,6 +610,93 @@ class _EmptyResources extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _StorageUsageIndicator extends StatelessWidget {
+  const _StorageUsageIndicator();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<ResourceBloc, ResourceState>(
+      builder: (context, state) {
+        final used = state.totalStorageUsed;
+        const max = 250.0 * 1024 * 1024;
+        final progress = (used / max).clamp(0.0, 1.0);
+        final percent = (progress * 100).toInt();
+
+        final usedMb = (used / (1024 * 1024)).toStringAsFixed(1);
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Theme.of(
+                context,
+              ).colorScheme.outline.withValues(alpha: 0.1),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.storage_rounded,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Storage Usage',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    '$percent%',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 8,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.1),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    progress > 0.9
+                        ? Colors.red
+                        : Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '$usedMb MB of 250 MB used',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

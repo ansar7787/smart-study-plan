@@ -1,75 +1,88 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:go_router/go_router.dart';
 import 'package:smart_study_plan/config/routes/app_routes.dart';
+import 'package:smart_study_plan/di/service_locator.dart';
+import 'package:smart_study_plan/core/utils/permission_handler.dart';
+import 'package:smart_study_plan/features/onboarding/presentation/bloc/onboarding_bloc.dart';
 import 'package:smart_study_plan/features/user_management/presentation/bloc/user_bloc.dart';
 
-class SplashPage extends StatefulWidget {
+class SplashPage extends StatelessWidget {
   const SplashPage({super.key});
 
   @override
-  State<SplashPage> createState() => _SplashPageState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => getIt<OnboardingBloc>()..add(CheckOnboardingStatus()),
+      child: const _SplashView(),
+    );
+  }
 }
 
-class _SplashPageState extends State<SplashPage>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _fade;
+class _SplashView extends StatefulWidget {
+  const _SplashView();
 
-  bool _authChecked = false;
+  @override
+  State<_SplashView> createState() => _SplashViewState();
+}
+
+class _SplashViewState extends State<_SplashView> {
   bool _minTimePassed = false;
+  bool _readyToNavigate = false;
 
   @override
   void initState() {
     super.initState();
+    _initApp();
+  }
 
-    /// Fade animation
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    );
+  Future<void> _initApp() async {
+    // Run permission check and min timer concurrently
+    await Future.wait([
+      askNotificationPermission(),
+      Future.delayed(const Duration(milliseconds: 1500)),
+    ]);
 
-    _fade = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
-
-    _controller.forward();
-
-    /// Minimum splash duration (800ms)
-    Timer(const Duration(milliseconds: 800), () {
-      _minTimePassed = true;
+    if (mounted) {
+      setState(() => _minTimePassed = true);
       _tryNavigate();
-    });
-
-    /// Trigger auth check
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<UserBloc>().add(const CheckAuthStatusEvent());
-    });
+    }
   }
 
   void _tryNavigate() {
     if (!mounted) return;
-    if (_authChecked && _minTimePassed) {
-      final state = context.read<UserBloc>().state;
 
-      if (state is UserAuthenticated) {
+    final onboardingState = context.read<OnboardingBloc>().state;
+
+    if (onboardingState is OnboardingRequired) {
+      // 🚀 SKIP SPLASH DELAY for first time users
+      context.goNamed(AppRouteNames.onboarding);
+      return;
+    }
+
+    // ⏳ WAIT FOR SPLASH DELAY for returning users
+    if (!_minTimePassed || !_readyToNavigate) return;
+
+    // Only check auth if onboarding is done/not required
+    if (onboardingState is OnboardingCompleted) {
+      final userState = context.read<UserBloc>().state;
+      if (userState.status == UserStatus.authenticated &&
+          userState.user != null) {
         context.goNamed(
-          state.user.isAdmin
+          userState.user!.isAdmin
               ? AppRouteNames.adminDashboard
               : AppRouteNames.home,
         );
-      } else {
+      } else if (userState.status != UserStatus.loading) {
         context.goNamed(AppRouteNames.login);
       }
     }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
   }
 
   @override
@@ -78,54 +91,103 @@ class _SplashPageState extends State<SplashPage>
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
-      body: BlocListener<UserBloc, UserState>(
-        listener: (context, state) {
-          if (!mounted) return;
-
-          if (state is UserAuthenticated ||
-              state is UserNotAuthenticated ||
-              state is UserError) {
-            _authChecked = true;
-            _tryNavigate();
-          }
-        },
-        child: FadeTransition(
-          opacity: _fade,
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                /// LOGO CONTAINER (SVG)
-                Container(
-                  height: 80,
-                  width: 80,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
+      body: MultiBlocListener(
+        listeners: [
+          BlocListener<OnboardingBloc, OnboardingState>(
+            listener: (context, state) {
+              if (state is OnboardingRequired) {
+                _readyToNavigate = true;
+                _tryNavigate();
+              } else if (state is OnboardingCompleted) {
+                // Trigger auth check ONLY after onboarding is confirmed complete
+                context.read<UserBloc>().add(const CheckAuthStatusEvent());
+              }
+            },
+          ),
+          BlocListener<UserBloc, UserState>(
+            listener: (context, state) {
+              if (state.status == UserStatus.authenticated ||
+                  state.status == UserStatus.failure ||
+                  state.status == UserStatus.unauthenticated) {
+                _readyToNavigate = true;
+                _tryNavigate();
+              }
+            },
+          ),
+        ],
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              /// LOGO CONTAINER (SVG) with DEBUG RESET
+              GestureDetector(
+                    onDoubleTap: () async {
+                      debugPrint('🔄 Resetting Onboarding...');
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setBool('onboarding_completed', false);
+                      if (context.mounted) {
+                        context.goNamed(AppRouteNames.onboarding);
+                      }
+                    },
+                    child: Container(
+                      height: 100.h,
+                      width: 100.h,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(24.r),
+                      ),
+                      padding: EdgeInsets.all(22.r),
+                      child: Image.asset('assets/logo/app_logo.png'),
+                    ),
+                  )
+                  .animate()
+                  .fadeIn(duration: 600.ms, curve: Curves.easeOut)
+                  .scale(delay: 200.ms, duration: 400.ms)
+                  .shimmer(
+                    delay: 1000.ms,
+                    duration: 1000.ms,
+                    color: theme.colorScheme.primary.withValues(alpha: 0.3),
                   ),
-                  padding: const EdgeInsets.all(18),
-                  child: SvgPicture.asset('assets/logo/app_logo.svg'),
-                ),
 
-                const SizedBox(height: 28),
+              SizedBox(height: 32.h),
 
-                /// APP NAME
-                Text(
-                  'Smart Study Planner',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
+              /// APP NAME
+              Text(
+                    'Smart Study Planner',
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
+                      fontSize: 28.sp,
+                    ),
+                  )
+                  .animate()
+                  .fadeIn(delay: 400.ms, duration: 600.ms)
+                  .slideY(
+                    begin: 0.2,
+                    end: 0,
+                    delay: 400.ms,
+                    curve: Curves.easeOutQuart,
                   ),
-                ),
 
-                const SizedBox(height: 8),
+              SizedBox(height: 12.h),
 
-                /// TAGLINE
-                Text(
-                  'Plan smarter. Learn better.',
-                  style: theme.textTheme.bodyMedium,
-                ),
-              ],
-            ),
+              /// TAGLINE
+              Text(
+                    'Plan smarter. Learn better.',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                      fontSize: 16.sp,
+                    ),
+                  )
+                  .animate()
+                  .fadeIn(delay: 600.ms, duration: 600.ms)
+                  .slideY(
+                    begin: 0.2,
+                    end: 0,
+                    delay: 600.ms,
+                    curve: Curves.easeOutQuart,
+                  ),
+            ],
           ),
         ),
       ),

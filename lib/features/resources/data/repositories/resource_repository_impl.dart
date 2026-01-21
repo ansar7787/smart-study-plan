@@ -67,6 +67,27 @@ class ResourceRepositoryImpl implements ResourceRepository {
     void Function(double progress)? onProgress,
   }) async {
     try {
+      // 🛑 LIMIT: 10MB (Per File)
+      final sizeInBytes = await file.length();
+      if (sizeInBytes > 10 * 1024 * 1024) {
+        return Left(ServerFailure('File too large (Max 10MB)'));
+      }
+
+      // 🛑 LIMIT: 250MB (Total Storage)
+      final remoteModels = await remote.getResourcesByUser(resource.userId);
+      final currentTotalSize = remoteModels.fold<int>(
+        0,
+        (sum, item) => sum + item.size,
+      );
+
+      if (currentTotalSize + sizeInBytes > 250 * 1024 * 1024) {
+        return Left(
+          ServerFailure(
+            'Maximum storage used (250MB already utilized). Please delete some resources to free up space.',
+          ),
+        );
+      }
+
       final uploadTask = storage.uploadFile(
         file: file,
         userId: resource.userId,

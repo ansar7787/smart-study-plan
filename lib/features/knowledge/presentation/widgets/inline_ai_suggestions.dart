@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../domain/enums/ai_action_type.dart';
 
 class InlineAiSuggestions extends StatelessWidget {
@@ -11,10 +12,10 @@ class InlineAiSuggestions extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: EdgeInsets.only(top: 8.h),
       child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
+        spacing: 8.w,
+        runSpacing: 8.h,
         children: [
           _AiChip(
             icon: Icons.summarize,
@@ -59,22 +60,22 @@ class _AiChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(24.r),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(24.r),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 6),
+            Icon(icon, size: 16.r, color: color),
+            SizedBox(width: 6.w),
             Text(
               label,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 12.sp,
                 fontWeight: FontWeight.w600,
                 color: color,
               ),

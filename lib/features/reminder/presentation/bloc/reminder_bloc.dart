@@ -25,7 +25,7 @@ class ReminderBloc extends Bloc<ReminderEvent, ReminderState> {
     required this.toggleReminder,
     required this.deleteReminder,
     required this.markTriggered,
-  }) : super(ReminderInitial()) {
+  }) : super(const ReminderState()) {
     on<GetRemindersEvent>(_onGetReminders);
     on<CreateReminderEvent>(_onCreateReminder);
     on<ToggleReminderActiveEvent>(_onToggle);
@@ -42,48 +42,78 @@ class ReminderBloc extends Bloc<ReminderEvent, ReminderState> {
     Emitter<ReminderState> emit,
   ) async {
     _currentUserId = event.userId;
-    emit(ReminderLoading());
+    emit(state.copyWith(status: ReminderBlocStatus.loading));
 
     final result = await getReminders(event.userId);
 
-    result.fold((failure) => emit(ReminderError(failure.message)), (reminders) {
-      // auto-disable expired reminders
-      final cleaned = reminders.map((r) {
-        if (r.isExpired && r.isActive) {
-          return r.copyWith(isActive: false, status: ReminderStatus.done);
-        }
-        return r;
-      }).toList();
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          status: ReminderBlocStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (reminders) {
+        // Auto-disable expired reminders logic (preserved)
+        final cleaned = reminders.map((r) {
+          if (r.isExpired && r.isActive) {
+            return r.copyWith(isActive: false, status: ReminderStatus.done);
+          }
+          return r;
+        }).toList();
 
-      emit(RemindersLoaded(cleaned));
-    });
+        emit(
+          state.copyWith(
+            status: ReminderBlocStatus.success,
+            reminders: cleaned,
+          ),
+        );
+      },
+    );
   }
 
-  // --------------------------------------------------
-  // CREATE REMINDER
-  // --------------------------------------------------
   Future<void> _onCreateReminder(
     CreateReminderEvent event,
     Emitter<ReminderState> emit,
   ) async {
+    emit(state.copyWith(status: ReminderBlocStatus.loading));
+
     final result = await createReminder(
       CreateReminderParams(reminder: event.reminder),
     );
 
-    result.fold((failure) => emit(ReminderError(failure.message)), (_) {
-      if (_currentUserId != null) {
-        add(GetRemindersEvent(_currentUserId!));
-      }
-    });
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          status: ReminderBlocStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (_) {
+        if (_currentUserId != null) {
+          add(GetRemindersEvent(_currentUserId!));
+        }
+      },
+    );
   }
 
-  // --------------------------------------------------
-  // TOGGLE ACTIVE
-  // --------------------------------------------------
   Future<void> _onToggle(
     ToggleReminderActiveEvent event,
     Emitter<ReminderState> emit,
   ) async {
+    final updatedReminders = state.reminders.map((r) {
+      return r.id == event.reminderId
+          ? r.copyWith(isActive: event.isActive)
+          : r;
+    }).toList();
+
+    emit(
+      state.copyWith(
+        reminders: updatedReminders,
+        status: ReminderBlocStatus.success,
+      ),
+    );
+
     final result = await toggleReminder(
       ToggleReminderParams(
         reminderId: event.reminderId,
@@ -91,79 +121,85 @@ class ReminderBloc extends Bloc<ReminderEvent, ReminderState> {
       ),
     );
 
-    result.fold((failure) => emit(ReminderError(failure.message)), (_) {
-      if (_currentUserId != null) {
-        add(GetRemindersEvent(_currentUserId!));
-      }
-    });
+    result.fold((failure) {
+      emit(
+        state.copyWith(
+          status: ReminderBlocStatus.failure,
+          errorMessage: failure.message,
+        ),
+      );
+      if (_currentUserId != null) add(GetRemindersEvent(_currentUserId!));
+    }, (_) {});
   }
 
-  // --------------------------------------------------
-  // NOTIFICATION TRIGGERED
-  // --------------------------------------------------
   Future<void> _onTriggered(
     MarkReminderTriggeredEvent event,
     Emitter<ReminderState> emit,
   ) async {
     final result = await markTriggered(event.reminderId);
 
-    result.fold((failure) => emit(ReminderError(failure.message)), (_) {
-      if (_currentUserId != null) {
-        add(GetRemindersEvent(_currentUserId!));
-      }
-    });
-  }
-
-  // --------------------------------------------------
-  // DELETE REMINDER
-  // --------------------------------------------------
-  Future<void> _onDelete(
-    DeleteReminderEvent event,
-    Emitter<ReminderState> emit,
-  ) async {
-    emit(ReminderLoading());
-
-    final result = await deleteReminder(event.reminderId);
-
-    if (emit.isDone) return;
-
-    await result.fold(
-      (failure) async {
-        if (!emit.isDone) {
-          emit(ReminderError(failure.message));
+    result.fold(
+      (failure) => emit(state.copyWith(errorMessage: failure.message)),
+      (_) {
+        if (_currentUserId != null) {
+          add(GetRemindersEvent(_currentUserId!));
         }
-      },
-      (_) async {
-        if (_currentUserId == null) return;
-
-        final refreshed = await getReminders(_currentUserId!);
-
-        if (emit.isDone) return;
-
-        refreshed.fold(
-          (failure) => emit(ReminderError(failure.message)),
-          (reminders) => emit(RemindersLoaded(reminders)),
-        );
       },
     );
   }
 
-  // --------------------------------------------------
-  // MARK DONE BY TASK
-  // --------------------------------------------------
-  void _onDoneByTask(
+  Future<void> _onDelete(
+    DeleteReminderEvent event,
+    Emitter<ReminderState> emit,
+  ) async {
+    final updatedReminders = state.reminders
+        .where((r) => r.id != event.reminderId)
+        .toList();
+    emit(
+      state.copyWith(
+        reminders: updatedReminders,
+        status: ReminderBlocStatus.success,
+      ),
+    );
+
+    final result = await deleteReminder(event.reminderId);
+
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          status: ReminderBlocStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (_) {},
+    );
+  }
+
+  Future<void> _onDoneByTask(
     MarkReminderDoneByTaskEvent event,
     Emitter<ReminderState> emit,
-  ) {
-    if (state is! RemindersLoaded) return;
+  ) async {
+    if (state.reminders.isEmpty) return;
 
-    final updated = (state as RemindersLoaded).reminders.map((r) {
+    // 1. Update Local State (Optimistic)
+    final updated = state.reminders.map((r) {
       if (r.taskId == event.taskId) {
         return r.copyWith(status: ReminderStatus.done, isActive: false);
       }
       return r;
     }).toList();
 
-    emit(RemindersLoaded(updated));
+    emit(
+      state.copyWith(reminders: updated, status: ReminderBlocStatus.success),
+    );
+
+    // 2. Persist Change (Fix for "Automatic Deletion" bug)
+    final targetReminder = state.reminders
+        .where((r) => r.taskId == event.taskId)
+        .firstOrNull;
+
+    if (targetReminder != null) {
+      add(DeleteReminderEvent(targetReminder.id));
+    }
   }
 }

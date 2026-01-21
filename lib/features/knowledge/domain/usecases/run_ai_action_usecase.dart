@@ -10,9 +10,10 @@ class RunAiActionUseCase {
   RunAiActionUseCase(this.repository);
 
   Future<Either<Failure, AiActionResult>> call({
+    required String userId,
     required AiActionType action,
     required String input,
   }) {
-    return repository.runAction(action: action, input: input);
+    return repository.runAction(userId: userId, action: action, input: input);
   }
 }

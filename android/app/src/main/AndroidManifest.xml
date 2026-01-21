@@ -44,7 +44,7 @@
     <!-- ===================================================== -->
     <application
         android:name="${applicationName}"
-        android:label="smart_study_plan"
+        android:label="Smart Study Planner"
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true">
 

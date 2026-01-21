@@ -45,6 +45,12 @@ class StudySessionModel extends HiveObject {
   @HiveField(12)
   final DateTime updatedAt;
 
+  @HiveField(13)
+  final int? actualDuration;
+
+  @HiveField(14)
+  final bool isCompleted;
+
   StudySessionModel({
     required this.id,
     required this.userId,
@@ -59,6 +65,8 @@ class StudySessionModel extends HiveObject {
     this.recurrencePattern,
     required this.createdAt,
     required this.updatedAt,
+    this.actualDuration,
+    required this.isCompleted,
   });
 
   StudySession toEntity() {
@@ -76,6 +84,8 @@ class StudySessionModel extends HiveObject {
       recurrencePattern: recurrencePattern,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      actualDuration: actualDuration,
+      isCompleted: isCompleted,
     );
   }
 
@@ -94,6 +104,8 @@ class StudySessionModel extends HiveObject {
       recurrencePattern: session.recurrencePattern,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
+      actualDuration: session.actualDuration,
+      isCompleted: session.isCompleted,
     );
   }
 
@@ -112,6 +124,8 @@ class StudySessionModel extends HiveObject {
       'recurrencePattern': recurrencePattern,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
+      'actualDuration': actualDuration,
+      'isCompleted': isCompleted,
     };
   }
 
@@ -130,6 +144,8 @@ class StudySessionModel extends HiveObject {
       recurrencePattern: json['recurrencePattern']?.toString(),
       createdAt: _parseDate(json['createdAt']),
       updatedAt: _parseDate(json['updatedAt']),
+      actualDuration: json['actualDuration'] as int?,
+      isCompleted: json['isCompleted'] ?? false,
     );
   }
 }

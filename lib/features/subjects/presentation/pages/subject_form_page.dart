@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:uuid/uuid.dart';
-
-import 'package:smart_study_plan/core/bloc/base_state.dart';
-import 'package:smart_study_plan/core/bloc/view_state.dart';
 
 import '../../domain/entities/subject.dart';
 import '../bloc/subject_bloc.dart';
 import '../bloc/subject_event.dart';
+import '../bloc/subject_state.dart';
 
 class SubjectFormPage extends StatefulWidget {
   final Subject? subject;
@@ -96,22 +95,22 @@ class _SubjectFormPageState extends State<SubjectFormPage> {
       appBar: AppBar(
         title: Text(widget.isEdit ? 'Edit Subject' : 'New Subject'),
       ),
-      body: BlocListener<SubjectBloc, BaseState<List<Subject>>>(
+      body: BlocListener<SubjectBloc, SubjectState>(
         listener: (context, state) {
-          final viewState = state.viewState;
-          if (viewState is ViewSuccess<List<Subject>>) {
+          if (state.status == SubjectStatus.success) {
             Navigator.pop(context);
           }
-          if (viewState is ViewFailure<List<Subject>>) {
+          if (state.status == SubjectStatus.failure &&
+              state.errorMessage != null) {
             ScaffoldMessenger.of(
               context,
-            ).showSnackBar(SnackBar(content: Text(viewState.message)));
+            ).showSnackBar(SnackBar(content: Text(state.errorMessage!)));
           }
         },
         child: Form(
           key: _formKey,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+            padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 90.h),
             children: [
               _SectionCard(
                 child: Column(
@@ -122,7 +121,7 @@ class _SubjectFormPageState extends State<SubjectFormPage> {
                       validator: (v) =>
                           v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12.h),
                     _Field(
                       controller: _description,
                       label: 'Description',
@@ -137,7 +136,7 @@ class _SubjectFormPageState extends State<SubjectFormPage> {
                 child: Column(
                   children: [
                     _Field(controller: _teacher, label: 'Teacher'),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12.h),
                     _Field(
                       controller: _credits,
                       label: 'Credits',
@@ -146,7 +145,7 @@ class _SubjectFormPageState extends State<SubjectFormPage> {
                           ? 'Invalid number'
                           : null,
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12.h),
                     _Field(controller: _semester, label: 'Semester'),
                   ],
                 ),
@@ -166,9 +165,9 @@ class _SubjectFormPageState extends State<SubjectFormPage> {
 
       /// 🔥 FIXED SAVE BUTTON
       bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(16.r),
         child: SizedBox(
-          height: 52,
+          height: 52.h,
           child: ElevatedButton(
             onPressed: _save,
             child: Text(widget.isEdit ? 'Update Subject' : 'Create Subject'),
@@ -193,10 +192,10 @@ class _SectionCard extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16.r),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(18.r),
         border: Border.all(color: theme.dividerColor.withValues(alpha: 0.4)),
       ),
       child: child,
@@ -233,7 +232,7 @@ class _Field extends StatelessWidget {
         filled: true,
         fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(14.r),
           borderSide: BorderSide.none,
         ),
       ),
@@ -265,14 +264,14 @@ class _ColorPicker extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Subject Color',
-          style: TextStyle(fontWeight: FontWeight.w600),
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14.sp),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12.h),
         Wrap(
-          spacing: 12,
-          runSpacing: 12,
+          spacing: 12.w,
+          runSpacing: 12.h,
           children: colors.map((c) {
             final isSelected = c.toARGB32() == selected.toARGB32();
 
@@ -280,18 +279,18 @@ class _ColorPicker extends StatelessWidget {
               onTap: () => onSelect(c),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                width: 36,
-                height: 36,
+                width: 36.w,
+                height: 36.h,
                 decoration: BoxDecoration(
                   color: c,
                   shape: BoxShape.circle,
                   border: Border.all(
                     color: isSelected ? Colors.black : Colors.transparent,
-                    width: 2,
+                    width: 2.w,
                   ),
                 ),
                 child: isSelected
-                    ? const Icon(Icons.check, size: 18, color: Colors.white)
+                    ? Icon(Icons.check, size: 18.sp, color: Colors.white)
                     : null,
               ),
             );

@@ -1,6 +1,6 @@
 import 'package:dartz/dartz.dart';
 import 'package:smart_study_plan/core/error/failures.dart';
-import 'package:smart_study_plan/features/knowledge/data/datasources/knowledge_ai_datasource.dart';
+import 'package:smart_study_plan/features/knowledge/data/datasources/ai_remote_datasource.dart';
 import 'package:smart_study_plan/features/knowledge/data/datasources/knowledge_local_datasource.dart';
 import 'package:smart_study_plan/features/knowledge/data/models/knowledge_item_model.dart';
 import 'package:smart_study_plan/features/knowledge/domain/entities/ai_action_result.dart';
@@ -11,7 +11,7 @@ import 'package:smart_study_plan/features/knowledge/domain/repositories/knowledg
 
 class KnowledgeRepositoryImpl implements KnowledgeRepository {
   final KnowledgeLocalDataSource local;
-  final KnowledgeAiDataSource ai;
+  final AiRemoteDataSource ai; // ✅ Changed to support Gemini
 
   KnowledgeRepositoryImpl({required this.local, required this.ai});
 
@@ -76,11 +76,7 @@ class KnowledgeRepositoryImpl implements KnowledgeRepository {
     required AiActionType action,
     required String input,
   }) async {
-    try {
-      final output = await ai.run(action: action, input: input);
-      return Right(AiActionResult(action: action, output: output));
-    } catch (e) {
-      return Left(ServerFailure(e.toString()));
-    }
+    // ✅ Delegate to Gemini DataSource
+    return await ai.runAction(action: action, input: input);
   }
 }

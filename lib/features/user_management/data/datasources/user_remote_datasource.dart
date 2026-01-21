@@ -15,6 +15,7 @@ abstract class UserRemoteDatasource {
   Future<UserModel> loginUser({
     required String email,
     required String password,
+    String? googleIdToken,
   });
 
   Future<void> logoutUser();
@@ -73,13 +74,38 @@ class UserRemoteDatasourceImpl implements UserRemoteDatasource {
   Future<UserModel> loginUser({
     required String email,
     required String password,
+    String? googleIdToken,
   }) async {
-    final cred = await auth.signInWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
+    UserCredential cred;
+    if (googleIdToken != null) {
+      final credential = GoogleAuthProvider.credential(idToken: googleIdToken);
+      cred = await auth.signInWithCredential(credential);
+    } else {
+      cred = await auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+    }
 
-    final doc = await firestore.collection('users').doc(cred.user!.uid).get();
+    final user = cred.user!;
+    final docRef = firestore.collection('users').doc(user.uid);
+    final doc = await docRef.get();
+
+    if (!doc.exists) {
+      // First time Google Login: Create user document
+      final now = DateTime.now();
+      final model = UserModel(
+        id: user.uid,
+        email: user.email ?? email,
+        name: user.displayName ?? 'Google User',
+        role: 'student',
+        photoUrl: user.photoURL,
+        createdAt: now,
+        updatedAt: now,
+      );
+      await docRef.set(model.toJson());
+      return model;
+    }
 
     return UserModel.fromJson(doc.data()!);
   }

@@ -9,7 +9,10 @@ abstract class TaskRepository {
 
   // Read
   Future<Either<Failure, Task>> getTask(String id);
-  Future<Either<Failure, List<Task>>> getTasksBySubject(String subjectId);
+  Future<Either<Failure, List<Task>>> getTasksBySubject(
+    String subjectId,
+    String userId,
+  );
   Future<Either<Failure, List<Task>>> getTasksByUser(String userId);
   Future<Either<Failure, List<Task>>> getAllTasks();
 

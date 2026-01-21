@@ -9,6 +9,7 @@ class Task extends Equatable {
   final List<String> tags; // NEW
   final int priority; // 1=Low, 2=Medium, 3=High
   final String status; // NEW: todo|in_progress|completed|on_hold
+  final DateTime? startDate; // NEW: Start Date & Time
   final DateTime dueDate;
   final DateTime? estimatedTime; // NEW
   final bool isCompleted;
@@ -24,6 +25,7 @@ class Task extends Equatable {
     required this.tags,
     required this.priority,
     required this.status,
+    this.startDate,
     required this.dueDate,
     this.estimatedTime,
     required this.isCompleted,
@@ -41,6 +43,7 @@ class Task extends Equatable {
     List<String>? tags,
     int? priority,
     String? status,
+    DateTime? startDate,
     DateTime? dueDate,
     DateTime? estimatedTime,
     bool? isCompleted,
@@ -56,6 +59,7 @@ class Task extends Equatable {
       tags: tags ?? this.tags,
       priority: priority ?? this.priority,
       status: status ?? this.status,
+      startDate: startDate ?? this.startDate,
       dueDate: dueDate ?? this.dueDate,
       estimatedTime: estimatedTime ?? this.estimatedTime,
       isCompleted: isCompleted ?? this.isCompleted,
@@ -74,6 +78,7 @@ class Task extends Equatable {
     tags,
     priority,
     status,
+    startDate,
     dueDate,
     estimatedTime,
     isCompleted,

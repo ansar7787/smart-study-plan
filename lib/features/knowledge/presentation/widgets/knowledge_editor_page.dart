@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/entities/knowledge_item.dart';
@@ -110,7 +111,7 @@ class _KnowledgeEditorPageState extends State<KnowledgeEditorPage> {
           elevation: 0,
           backgroundColor: accent.withValues(alpha: 0.10),
           foregroundColor: accent,
-          title: Text('Edit ${type.label}'),
+          title: Text('Edit ${type.label}', style: TextStyle(fontSize: 18.sp)),
         ),
 
         // ------------------------------------------------------------------
@@ -119,29 +120,29 @@ class _KnowledgeEditorPageState extends State<KnowledgeEditorPage> {
         bottomNavigationBar: SafeArea(
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 250),
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 16.h),
             decoration: BoxDecoration(
               color: theme.colorScheme.surface,
               boxShadow: [
                 if (_isDirty)
                   BoxShadow(
-                    blurRadius: 20,
+                    blurRadius: 20.r,
                     color: accent.withValues(alpha: 0.25),
                   ),
               ],
             ),
             child: FilledButton.icon(
               onPressed: _isDirty ? _save : null,
-              icon: const Icon(Icons.check),
-              label: const Text(
+              icon: Icon(Icons.check, size: 20.r),
+              label: Text(
                 'Save changes',
-                style: TextStyle(fontWeight: FontWeight.w600),
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16.sp),
               ),
               style: FilledButton.styleFrom(
                 backgroundColor: accent,
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: EdgeInsets.symmetric(vertical: 14.h),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(16.r),
                 ),
               ),
             ),
@@ -153,22 +154,22 @@ class _KnowledgeEditorPageState extends State<KnowledgeEditorPage> {
         // ------------------------------------------------------------------
         body: SafeArea(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+            padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 120.h),
             children: [
               // --------------------------------------------------------------
               // 🏷️ TITLE FIELD
               // --------------------------------------------------------------
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.symmetric(horizontal: 16.w),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(18.r),
                 ),
                 child: TextField(
                   controller: _titleCtrl,
                   textInputAction: TextInputAction.next,
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w600,
-                    fontSize: 20,
+                    fontSize: 20.sp,
                   ),
                   decoration: const InputDecoration(
                     hintText: 'Title',
@@ -177,25 +178,28 @@ class _KnowledgeEditorPageState extends State<KnowledgeEditorPage> {
                 ),
               ),
 
-              const SizedBox(height: 20),
+              SizedBox(height: 20.h),
 
               // --------------------------------------------------------------
               // 📝 CONTENT FIELD
               // --------------------------------------------------------------
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(16.r),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceContainerHighest.withValues(
                     alpha: 0.35,
                   ),
-                  borderRadius: BorderRadius.circular(22),
+                  borderRadius: BorderRadius.circular(22.r),
                 ),
                 child: TextField(
                   controller: _contentCtrl,
                   maxLines: null,
                   minLines: 10,
                   keyboardType: TextInputType.multiline,
-                  style: theme.textTheme.bodyLarge?.copyWith(height: 1.6),
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    height: 1.6,
+                    fontSize: 16.sp,
+                  ),
                   decoration: const InputDecoration(
                     hintText: 'Start writing your thoughts here…',
                     border: InputBorder.none,
@@ -203,19 +207,20 @@ class _KnowledgeEditorPageState extends State<KnowledgeEditorPage> {
                 ),
               ),
 
-              const SizedBox(height: 20),
+              SizedBox(height: 20.h),
 
               // --------------------------------------------------------------
               // ℹ️ HELPER TEXT
               // --------------------------------------------------------------
               Row(
                 children: [
-                  Icon(Icons.info_outline, size: 16, color: accent),
-                  const SizedBox(width: 6),
+                  Icon(Icons.info_outline, size: 16.r, color: accent),
+                  SizedBox(width: 6.w),
                   Text(
                     'Changes are saved only when you tap Save',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                      fontSize: 12.sp,
                     ),
                   ),
                 ],

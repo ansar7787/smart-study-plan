@@ -7,6 +7,7 @@ import 'package:smart_study_plan/features/admin_panel/domain/entities/admin_stat
 import 'package:smart_study_plan/features/admin_panel/presentation/bloc/admin_dashboard/admin_dashboard_bloc.dart';
 import 'package:smart_study_plan/features/admin_panel/presentation/widgets/stats_card.dart';
 import 'package:smart_study_plan/config/routes/app_routes.dart';
+import 'package:smart_study_plan/core/widgets/skeletons/dashboard_card_skeleton.dart';
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -47,17 +48,47 @@ class _AdminDashboardView extends StatelessWidget {
       ),
       body: BlocBuilder<AdminDashboardBloc, AdminDashboardState>(
         builder: (context, state) {
-          if (state is AdminDashboardInitial ||
-              state is AdminDashboardLoading) {
-            return const Center(child: CircularProgressIndicator());
+          if (state.status == AdminDashboardStatus.loading) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Overview',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  GridView.count(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: const [
+                      DashboardCardSkeleton(),
+                      DashboardCardSkeleton(),
+                      DashboardCardSkeleton(),
+                      DashboardCardSkeleton(),
+                    ],
+                  ),
+                ],
+              ),
+            );
           }
 
-          if (state is AdminDashboardError) {
-            return _ErrorView(message: state.message);
+          if (state.status == AdminDashboardStatus.failure) {
+            return _ErrorView(message: state.errorMessage ?? 'Unknown error');
           }
 
-          if (state is AdminDashboardLoaded) {
-            return _DashboardContent(stats: state.stats);
+          if (state.status == AdminDashboardStatus.success &&
+              state.stats != null) {
+            return _DashboardContent(stats: state.stats!);
           }
 
           return const SizedBox.shrink();

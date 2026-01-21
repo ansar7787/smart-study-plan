@@ -1,33 +1,31 @@
 import 'package:equatable/equatable.dart';
 import '../../domain/entities/analytics_overview.dart';
 
-abstract class AnalyticsState extends Equatable {
-  const AnalyticsState();
+enum AnalyticsStatus { initial, loading, success, failure }
+
+class AnalyticsState extends Equatable {
+  final AnalyticsStatus status;
+  final AnalyticsOverview? overview;
+  final String? errorMessage;
+
+  const AnalyticsState({
+    this.status = AnalyticsStatus.initial,
+    this.overview,
+    this.errorMessage,
+  });
+
+  AnalyticsState copyWith({
+    AnalyticsStatus? status,
+    AnalyticsOverview? overview,
+    String? errorMessage,
+  }) {
+    return AnalyticsState(
+      status: status ?? this.status,
+      overview: overview ?? this.overview,
+      errorMessage: errorMessage,
+    );
+  }
 
   @override
-  List<Object?> get props => [];
-}
-
-class AnalyticsInitial extends AnalyticsState {}
-
-class AnalyticsLoading extends AnalyticsState {}
-
-class AnalyticsLoaded extends AnalyticsState {
-  final AnalyticsOverview overview;
-
-  const AnalyticsLoaded(this.overview);
-
-  @override
-  List<Object?> get props => [overview];
-}
-
-class AnalyticsActionSuccess extends AnalyticsState {}
-
-class AnalyticsError extends AnalyticsState {
-  final String message;
-
-  const AnalyticsError(this.message);
-
-  @override
-  List<Object?> get props => [message];
+  List<Object?> get props => [status, overview, errorMessage];
 }

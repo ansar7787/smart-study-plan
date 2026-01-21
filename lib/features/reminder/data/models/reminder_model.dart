@@ -200,11 +200,15 @@ class ReminderModel extends HiveObject {
   @HiveField(10)
   final int minutesBefore;
 
+  @HiveField(11)
+  final String? subjectId;
+
   ReminderModel({
     required this.id,
     required this.userId,
     this.taskId,
     this.sessionId,
+    this.subjectId,
     required this.title,
     this.description,
     required this.reminderTime,
@@ -219,6 +223,7 @@ class ReminderModel extends HiveObject {
     userId: userId,
     taskId: taskId,
     sessionId: sessionId,
+    subjectId: subjectId,
     title: title,
     description: description,
     reminderTime: reminderTime,
@@ -234,6 +239,7 @@ class ReminderModel extends HiveObject {
       userId: r.userId,
       taskId: r.taskId,
       sessionId: r.sessionId,
+      subjectId: r.subjectId,
       title: r.title,
       description: r.description,
       reminderTime: r.reminderTime,
@@ -249,6 +255,7 @@ class ReminderModel extends HiveObject {
     'userId': userId,
     'taskId': taskId,
     'sessionId': sessionId,
+    'subjectId': subjectId,
     'title': title,
     'description': description,
     'reminderTime': reminderTime.toIso8601String(),
@@ -263,6 +270,7 @@ class ReminderModel extends HiveObject {
     String? userId,
     String? taskId,
     String? sessionId,
+    String? subjectId,
     String? title,
     String? description,
     DateTime? reminderTime,
@@ -276,6 +284,7 @@ class ReminderModel extends HiveObject {
       userId: userId ?? this.userId,
       taskId: taskId ?? this.taskId,
       sessionId: sessionId ?? this.sessionId,
+      subjectId: subjectId ?? this.subjectId,
       title: title ?? this.title,
       description: description ?? this.description,
       reminderTime: reminderTime ?? this.reminderTime,
@@ -292,6 +301,7 @@ class ReminderModel extends HiveObject {
       userId: json['userId'],
       taskId: json['taskId'],
       sessionId: json['sessionId'],
+      subjectId: json['subjectId'],
       title: json['title'],
       description: json['description'],
       reminderTime: DateTime.parse(json['reminderTime']),

@@ -45,6 +45,9 @@ class TaskModel extends HiveObject {
   @HiveField(12)
   final DateTime updatedAt;
 
+  @HiveField(13)
+  final DateTime? startDate; // NEW
+
   TaskModel({
     required this.id,
     required this.subjectId,
@@ -54,6 +57,7 @@ class TaskModel extends HiveObject {
     required this.tags,
     required this.priority,
     required this.status,
+    this.startDate,
     required this.dueDate,
     this.estimatedTime,
     required this.isCompleted,
@@ -73,6 +77,7 @@ class TaskModel extends HiveObject {
       tags: tags,
       priority: priority,
       status: status,
+      startDate: startDate,
       dueDate: dueDate,
       estimatedTime: estimatedTime,
       isCompleted: isCompleted,
@@ -91,6 +96,7 @@ class TaskModel extends HiveObject {
       tags: task.tags,
       priority: task.priority,
       status: task.status,
+      startDate: task.startDate,
       dueDate: task.dueDate,
       estimatedTime: task.estimatedTime,
       isCompleted: task.isCompleted,
@@ -130,13 +136,16 @@ class TaskModel extends HiveObject {
       'tags': tags,
       'priority': priority,
       'status': status,
-      'dueDate': Timestamp.fromDate(dueDate), // ✅ FIX
+      'startDate': startDate != null
+          ? Timestamp.fromDate(startDate!)
+          : null, // ✅ NEW
+      'dueDate': Timestamp.fromDate(dueDate),
       'estimatedTime': estimatedTime != null
           ? Timestamp.fromDate(estimatedTime!)
           : null,
       'isCompleted': isCompleted,
-      'createdAt': Timestamp.fromDate(createdAt), // ✅ FIX
-      'updatedAt': Timestamp.fromDate(updatedAt), // ✅ FIX
+      'createdAt': Timestamp.fromDate(createdAt),
+      'updatedAt': Timestamp.fromDate(updatedAt),
     };
   }
 
@@ -150,7 +159,12 @@ class TaskModel extends HiveObject {
       tags: List<String>.from(json['tags'] ?? []),
       priority: json['priority'] ?? 2,
       status: json['status'] ?? 'todo',
-      dueDate: _parseDate(json['dueDate']),
+      startDate: json['startDate'] != null
+          ? _parseDate(json['startDate'])
+          : null, // ✅ NEW
+      dueDate: _parseDate(
+        json['dueDate'],
+      ), // Assuming safe parser handle null if field missing (Wait, parseDate handles null by returning Now. dueDate is required. Correct.)
       estimatedTime: json['estimatedTime'] != null
           ? _parseDate(json['estimatedTime'])
           : null,

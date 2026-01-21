@@ -1,60 +1,43 @@
 import 'package:equatable/equatable.dart';
 import '../../domain/entities/knowledge_item.dart';
-import '../../domain/entities/ai_action_result.dart';
+import '../../domain/entities/ai_action_result.dart'; // ✅ Import this
 
-abstract class KnowledgeState extends Equatable {
-  const KnowledgeState();
+enum KnowledgeStatus { initial, loading, success, failure }
 
-  @override
-  List<Object?> get props => [];
-}
+enum AiStatus { initial, loading, success, failure }
 
-class KnowledgeInitial extends KnowledgeState {}
-
-class KnowledgeLoading extends KnowledgeState {}
-
-class KnowledgeLoaded extends KnowledgeState {
+class KnowledgeState extends Equatable {
+  final KnowledgeStatus status;
   final List<KnowledgeItem> items;
+  final String? errorMessage;
 
-  const KnowledgeLoaded(this.items);
+  final AiStatus aiStatus;
+  final AiActionResult? aiResult; // ✅ Changed from String? aiOutput
 
-  @override
-  List<Object?> get props => [items];
-}
+  const KnowledgeState({
+    this.status = KnowledgeStatus.initial,
+    this.items = const [],
+    this.errorMessage,
+    this.aiStatus = AiStatus.initial,
+    this.aiResult,
+  });
 
-class KnowledgeError extends KnowledgeState {
-  final String message;
-
-  const KnowledgeError(this.message);
-
-  @override
-  List<Object?> get props => [message];
-}
-
-// -------- CRUD FEEDBACK --------
-
-class KnowledgeItemCreated extends KnowledgeState {
-  final KnowledgeItem item;
-
-  const KnowledgeItemCreated(this.item);
-
-  @override
-  List<Object?> get props => [item];
-}
-
-class KnowledgeItemUpdated extends KnowledgeState {}
-
-class KnowledgeItemDeleted extends KnowledgeState {}
-
-// -------- AI --------
-
-class AiActionRunning extends KnowledgeState {}
-
-class AiActionCompleted extends KnowledgeState {
-  final AiActionResult result;
-
-  const AiActionCompleted(this.result);
+  KnowledgeState copyWith({
+    KnowledgeStatus? status,
+    List<KnowledgeItem>? items,
+    String? errorMessage,
+    AiStatus? aiStatus,
+    AiActionResult? aiResult,
+  }) {
+    return KnowledgeState(
+      status: status ?? this.status,
+      items: items ?? this.items,
+      errorMessage: errorMessage,
+      aiStatus: aiStatus ?? this.aiStatus,
+      aiResult: aiResult ?? this.aiResult,
+    );
+  }
 
   @override
-  List<Object?> get props => [result];
+  List<Object?> get props => [status, items, errorMessage, aiStatus, aiResult];
 }

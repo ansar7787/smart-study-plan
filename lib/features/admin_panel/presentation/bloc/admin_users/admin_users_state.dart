@@ -1,34 +1,30 @@
 part of 'admin_users_bloc.dart';
 
-abstract class AdminUsersState extends Equatable {
-  const AdminUsersState();
+enum AdminUsersStatus { initial, loading, success, failure }
 
-  @override
-  List<Object?> get props => [];
-}
-
-class UsersInitial extends AdminUsersState {
-  const UsersInitial();
-}
-
-class UsersLoading extends AdminUsersState {
-  const UsersLoading();
-}
-
-class UsersLoaded extends AdminUsersState {
+class AdminUsersState extends Equatable {
+  final AdminUsersStatus status;
   final List<User> users;
+  final String? errorMessage;
 
-  const UsersLoaded(this.users);
+  const AdminUsersState({
+    this.status = AdminUsersStatus.initial,
+    this.users = const [],
+    this.errorMessage,
+  });
+
+  AdminUsersState copyWith({
+    AdminUsersStatus? status,
+    List<User>? users,
+    String? errorMessage,
+  }) {
+    return AdminUsersState(
+      status: status ?? this.status,
+      users: users ?? this.users,
+      errorMessage: errorMessage,
+    );
+  }
 
   @override
-  List<Object?> get props => [users];
-}
-
-class UsersError extends AdminUsersState {
-  final String message;
-
-  const UsersError(this.message);
-
-  @override
-  List<Object?> get props => [message];
+  List<Object?> get props => [status, users, errorMessage];
 }

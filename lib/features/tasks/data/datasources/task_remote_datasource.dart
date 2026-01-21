@@ -5,7 +5,7 @@ abstract class TaskRemoteDataSource {
   Future<void> createTask(TaskModel taskModel);
   Future<void> updateTask(TaskModel taskModel);
   Future<void> deleteTask(String taskId);
-  Future<List<TaskModel>> getTasksBySubject(String subjectId);
+  Future<List<TaskModel>> getTasksBySubject(String subjectId, String userId);
   Future<List<TaskModel>> getTasksByUser(String userId);
   Future<List<TaskModel>> getAllTasks();
   Future<TaskModel> getTask(String id);
@@ -38,10 +38,14 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
   }
 
   @override
-  Future<List<TaskModel>> getTasksBySubject(String subjectId) async {
+  Future<List<TaskModel>> getTasksBySubject(
+    String subjectId,
+    String userId,
+  ) async {
     final querySnapshot = await firestore
         .collection('tasks')
         .where('subjectId', isEqualTo: subjectId)
+        .where('userId', isEqualTo: userId)
         .orderBy('dueDate')
         .get();
 
@@ -55,7 +59,6 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
     final querySnapshot = await firestore
         .collection('tasks')
         .where('userId', isEqualTo: userId)
-        .orderBy('dueDate')
         .get();
 
     return querySnapshot.docs

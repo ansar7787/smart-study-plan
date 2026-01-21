@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../domain/entities/ai_action_result.dart';
 
 class AiResultView extends StatelessWidget {
@@ -12,16 +13,19 @@ class AiResultView extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Divider(),
-        const Text('Result', style: TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
+        Text(
+          'Result',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.sp),
+        ),
+        SizedBox(height: 8.h),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.all(12.r),
           decoration: BoxDecoration(
             color: Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(12.r),
           ),
-          child: Text(result.output, style: const TextStyle(fontSize: 14)),
+          child: Text(result.output, style: TextStyle(fontSize: 14.sp)),
         ),
       ],
     );

@@ -9,6 +9,9 @@ class UserModel {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  final int aiUsageCount;
+  final DateTime? lastAiUsageDate;
+
   UserModel({
     required this.id,
     required this.email,
@@ -17,6 +20,8 @@ class UserModel {
     this.photoUrl,
     required this.createdAt,
     required this.updatedAt,
+    this.aiUsageCount = 0,
+    this.lastAiUsageDate,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -28,6 +33,10 @@ class UserModel {
       photoUrl: json['photoUrl'],
       createdAt: DateTime.parse(json['createdAt']),
       updatedAt: DateTime.parse(json['updatedAt']),
+      aiUsageCount: json['aiUsageCount'] ?? 0,
+      lastAiUsageDate: json['lastAiUsageDate'] != null
+          ? DateTime.parse(json['lastAiUsageDate'])
+          : null,
     );
   }
 
@@ -41,6 +50,8 @@ class UserModel {
       photoUrl: user.photoUrl,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+      aiUsageCount: user.aiUsageCount,
+      lastAiUsageDate: user.lastAiUsageDate,
     );
   }
 
@@ -52,6 +63,8 @@ class UserModel {
     'photoUrl': photoUrl,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
+    'aiUsageCount': aiUsageCount,
+    'lastAiUsageDate': lastAiUsageDate?.toIso8601String(),
   };
 
   User toEntity() {
@@ -63,6 +76,8 @@ class UserModel {
       photoUrl: photoUrl,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      aiUsageCount: aiUsageCount,
+      lastAiUsageDate: lastAiUsageDate,
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class AiActionButton extends StatelessWidget {
   final IconData icon;
@@ -16,21 +17,21 @@ class AiActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(12.r),
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(12.r),
             decoration: BoxDecoration(
               color: Theme.of(
                 context,
               ).colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(12.r),
             ),
-            child: Icon(icon, size: 24),
+            child: Icon(icon, size: 24.r),
           ),
-          const SizedBox(height: 6),
-          Text(label, style: const TextStyle(fontSize: 12)),
+          SizedBox(height: 6.h),
+          Text(label, style: TextStyle(fontSize: 12.sp)),
         ],
       ),
     );

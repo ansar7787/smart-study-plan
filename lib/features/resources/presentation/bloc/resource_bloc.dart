@@ -1,8 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:smart_study_plan/features/resources/domain/usecases/restore_resource.dart';
 import 'package:smart_study_plan/features/resources/domain/usecases/soft_delete_resource.dart';
-import '../../../../core/bloc/base_bloc.dart';
-import '../../../../core/bloc/base_state.dart';
 import '../../domain/entities/file_resource.dart';
 
 import '../../domain/usecases/get_resources_by_subject.dart';
@@ -10,8 +8,9 @@ import '../../domain/usecases/get_resources_by_user.dart';
 import '../../domain/usecases/toggle_favorite_resource.dart';
 import '../../domain/usecases/upload_resource.dart';
 import 'resource_event.dart';
+import 'resource_state.dart';
 
-class ResourceBloc extends BaseBloc<ResourceEvent, List<FileResource>> {
+class ResourceBloc extends Bloc<ResourceEvent, ResourceState> {
   final GetResourcesByUserUsecase getByUser;
   final GetResourcesBySubjectUsecase getBySubject;
   final UploadResourceUsecase upload;
@@ -26,104 +25,163 @@ class ResourceBloc extends BaseBloc<ResourceEvent, List<FileResource>> {
     required this.softDelete,
     required this.restore,
     required this.toggleFavorite,
-  }) : super(BaseState.initial()) {
+  }) : super(const ResourceState()) {
     on<LoadResourcesByUserEvent>(_onLoadByUser);
     on<LoadResourcesBySubjectEvent>(_onLoadBySubject);
     on<UploadResourceEvent>(_onUpload);
     on<SoftDeleteResourceEvent>(_onSoftDelete);
     on<RestoreResourceEvent>(_onRestore);
     on<ToggleFavoriteResourceEvent>(_onToggleFavorite);
+    on<UploadProgressEvent>(_onUploadProgress);
   }
 
   // ================= LOAD =================
 
   Future<void> _onLoadByUser(
     LoadResourcesByUserEvent event,
-    Emitter<BaseState<List<FileResource>>> emit,
+    Emitter<ResourceState> emit,
   ) async {
-    emitLoading(emit);
+    emit(state.copyWith(status: ResourceStatus.loading, resources: []));
 
     final result = await getByUser(event.userId);
-    result.fold((f) => emitFailure(emit, f), (r) => emitSuccess(emit, r));
+    result.fold(
+      (f) => emit(
+        state.copyWith(status: ResourceStatus.failure, errorMessage: f.message),
+      ),
+      (r) {
+        final total = r.fold<double>(0, (sum, item) => sum + item.size);
+        emit(
+          state.copyWith(
+            status: ResourceStatus.success,
+            resources: r,
+            totalStorageUsed: total,
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _onLoadBySubject(
     LoadResourcesBySubjectEvent event,
-    Emitter<BaseState<List<FileResource>>> emit,
+    Emitter<ResourceState> emit,
   ) async {
-    emitLoading(emit);
+    emit(state.copyWith(status: ResourceStatus.loading, resources: []));
 
     final result = await getBySubject(event.subjectId);
-    result.fold((f) => emitFailure(emit, f), (r) => emitSuccess(emit, r));
+    result.fold(
+      (f) => emit(
+        state.copyWith(status: ResourceStatus.failure, errorMessage: f.message),
+      ),
+      (r) => emit(state.copyWith(status: ResourceStatus.success, resources: r)),
+    );
   }
 
   // ================= UPLOAD =================
 
   Future<void> _onUpload(
     UploadResourceEvent event,
-    Emitter<BaseState<List<FileResource>>> emit,
+    Emitter<ResourceState> emit,
   ) async {
-    emit(BaseState.loadingWithProgress(0));
+    // Keep showing loading but with reset progress
+    emit(state.copyWith(status: ResourceStatus.loading, uploadProgress: 0.0));
 
     final result = await upload(
       UploadResourceParams(
         resource: event.resource,
         file: event.file,
         onProgress: (p) {
-          emit(BaseState.loadingWithProgress(p));
+          add(UploadProgressEvent(p));
         },
       ),
     );
 
-    result.fold((f) => emitFailure(emit, f), (_) => _refresh(event.resource));
+    result.fold(
+      (f) => emit(
+        state.copyWith(status: ResourceStatus.failure, errorMessage: f.message),
+      ),
+      (_) => _refresh(event.resource),
+    );
   }
 
-  // ================= SOFT DELETE (FOLD) =================
+  void _onUploadProgress(
+    UploadProgressEvent event,
+    Emitter<ResourceState> emit,
+  ) {
+    emit(state.copyWith(uploadProgress: event.progress));
+  }
+
+  // ================= SOFT DELETE =================
 
   Future<void> _onSoftDelete(
     SoftDeleteResourceEvent event,
-    Emitter<BaseState<List<FileResource>>> emit,
+    Emitter<ResourceState> emit,
   ) async {
-    emitLoading(emit);
+    // optimistically update? For now just loading
+    emit(state.copyWith(status: ResourceStatus.loading));
 
     final result = await softDelete(event.resource);
 
-    result.fold((f) => emitFailure(emit, f), (_) => _refresh(event.resource));
+    result.fold(
+      (f) => emit(
+        state.copyWith(status: ResourceStatus.failure, errorMessage: f.message),
+      ),
+      (_) => _refresh(event.resource),
+    );
   }
 
-  // ================= RESTORE (FOLD) =================
+  // ================= RESTORE =================
 
   Future<void> _onRestore(
     RestoreResourceEvent event,
-    Emitter<BaseState<List<FileResource>>> emit,
+    Emitter<ResourceState> emit,
   ) async {
-    emitLoading(emit);
+    emit(state.copyWith(status: ResourceStatus.loading));
 
     final result = await restore(event.resource);
 
-    result.fold((f) => emitFailure(emit, f), (_) => _refresh(event.resource));
+    result.fold(
+      (f) => emit(
+        state.copyWith(status: ResourceStatus.failure, errorMessage: f.message),
+      ),
+      (_) => _refresh(event.resource),
+    );
   }
 
   // ================= FAVORITE =================
 
   Future<void> _onToggleFavorite(
     ToggleFavoriteResourceEvent event,
-    Emitter<BaseState<List<FileResource>>> emit,
+    Emitter<ResourceState> emit,
   ) async {
-    emitLoading(emit);
+    // Optimistic Update
+    final currentResources = List<FileResource>.from(state.resources);
+    final index = currentResources.indexWhere((r) => r.id == event.resource.id);
+    if (index != -1) {
+      currentResources[index] = event.resource.copyWith(
+        isFavorite: !event.resource.isFavorite,
+      );
+      emit(state.copyWith(resources: currentResources));
+    }
 
     final result = await toggleFavorite(event.resource);
 
-    result.fold((f) => emitFailure(emit, f), (_) => _refresh(event.resource));
+    result.fold(
+      (f) => emit(
+        state.copyWith(status: ResourceStatus.failure, errorMessage: f.message),
+      ),
+      (_) {
+        // success, already updated optimistically
+      },
+    );
   }
 
   // ================= HELPER =================
 
   void _refresh(FileResource resource) {
+    // Always refresh full list to update total storage usage
+    add(LoadResourcesByUserEvent(resource.userId));
     if (resource.subjectId != null) {
       add(LoadResourcesBySubjectEvent(resource.subjectId!));
-    } else {
-      add(LoadResourcesByUserEvent(resource.userId));
     }
   }
 }

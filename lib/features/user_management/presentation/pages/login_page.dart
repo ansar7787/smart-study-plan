@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:smart_study_plan/config/routes/app_routes.dart';
@@ -21,12 +22,16 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
   bool _hidePassword = true;
 
   @override
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -43,25 +48,26 @@ class _LoginPageState extends State<LoginPage> {
     return AuthScaffold(
       child: BlocListener<UserBloc, UserState>(
         listener: (context, state) {
-          if (state is UserAuthenticated) {
+          if (state.status == UserStatus.authenticated && state.user != null) {
             context.goNamed(
-              state.user.isAdmin
+              state.user!.isAdmin
                   ? AppRouteNames.adminDashboard
                   : AppRouteNames.home,
             );
           }
 
-          if (state is UserError) {
+          if (state.status == UserStatus.failure &&
+              state.errorMessage != null) {
             ScaffoldMessenger.of(
               context,
-            ).showSnackBar(SnackBar(content: Text(state.message)));
+            ).showSnackBar(SnackBar(content: Text(state.errorMessage!)));
           }
         },
         child: AuthCard(
           child: Form(
             key: _formKey,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const AuthHeader(
                   title: 'Welcome back',
@@ -71,17 +77,20 @@ class _LoginPageState extends State<LoginPage> {
                 AuthTextField(
                   label: 'Email',
                   controller: _email,
+                  focusNode: _emailFocus,
+                  nextFocusNode: _passwordFocus,
                   hint: 'you@example.com',
                   icon: Icons.email_outlined,
                   keyboardType: TextInputType.emailAddress,
                   validator: (v) =>
                       v != null && v.contains('@') ? null : 'Invalid email',
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16.h), // ScreenUtil
 
                 AuthTextField(
                   label: 'Password',
                   controller: _password,
+                  focusNode: _passwordFocus,
                   hint: '••••••••',
                   icon: Icons.lock_outline,
                   obscureText: _hidePassword,
@@ -94,35 +103,70 @@ class _LoginPageState extends State<LoginPage> {
                       _hidePassword
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined,
+                      size: 20.sp, // ScreenUtil
                     ),
                   ),
                 ),
+
+                SizedBox(height: 8.h),
 
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () =>
                         context.pushNamed(AppRouteNames.forgotPassword),
-                    child: const Text('Forgot password?'),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 8.w,
+                        vertical: 4.h,
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      'Forgot password?',
+                      style: TextStyle(fontSize: 14.sp),
+                    ),
                   ),
                 ),
+
+                SizedBox(height: 24.h),
 
                 BlocBuilder<UserBloc, UserState>(
                   builder: (context, state) {
                     return AuthSubmitButton(
-                      loading: state is UserLoading,
+                      loading: state.status == UserStatus.loading,
                       onPressed: _login,
                       text: 'Login',
                     );
                   },
                 ),
 
-                const SizedBox(height: 20),
+                SizedBox(height: 32.h),
 
                 Center(
-                  child: TextButton(
-                    onPressed: () => context.pushNamed(AppRouteNames.register),
-                    child: const Text("Don't have an account? Register"),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "Don't have an account?",
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 14.sp,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () =>
+                            context.pushNamed(AppRouteNames.register),
+                        child: Text(
+                          "Register",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14.sp,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

@@ -1,8 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import 'package:smart_study_plan/core/bloc/base_bloc.dart';
-import 'package:smart_study_plan/core/bloc/base_state.dart';
-
 import '../../domain/entities/study_session.dart';
 import '../../domain/usecases/create_session.dart';
 import '../../domain/usecases/update_session.dart';
@@ -11,8 +8,9 @@ import '../../domain/usecases/get_sessions_by_date.dart';
 import '../../domain/usecases/get_sessions_by_user.dart';
 
 import 'planner_event.dart';
+import 'planner_state.dart';
 
-class PlannerBloc extends BaseBloc<PlannerEvent, List<StudySession>> {
+class PlannerBloc extends Bloc<PlannerEvent, PlannerState> {
   final CreateSession createSession;
   final UpdateSession updateSession;
   final DeleteSession deleteSession;
@@ -25,7 +23,7 @@ class PlannerBloc extends BaseBloc<PlannerEvent, List<StudySession>> {
     required this.deleteSession,
     required this.getSessionsByDate,
     required this.getSessionsByUser,
-  }) : super(BaseState.initial()) {
+  }) : super(const PlannerState()) {
     on<LoadSessionsByUserEvent>(_onLoadByUser);
     on<LoadSessionsByDateEvent>(_onLoadByDate);
     on<CreateSessionEvent>(_onCreate);
@@ -33,76 +31,108 @@ class PlannerBloc extends BaseBloc<PlannerEvent, List<StudySession>> {
     on<DeleteSessionEvent>(_onDelete);
   }
 
-  // ---------------- LOAD BY USER ----------------
-
   Future<void> _onLoadByUser(
     LoadSessionsByUserEvent event,
-    Emitter<BaseState<List<StudySession>>> emit,
+    Emitter<PlannerState> emit,
   ) async {
-    emitLoading(emit);
+    emit(state.copyWith(status: PlannerStatus.loading));
 
     final result = await getSessionsByUser(event.userId);
 
     result.fold(
-      (failure) => emitFailure(emit, failure),
-      (sessions) => emitSuccess(emit, sessions),
+      (failure) => emit(
+        state.copyWith(
+          status: PlannerStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (sessions) => emit(
+        state.copyWith(status: PlannerStatus.success, sessions: sessions),
+      ),
     );
   }
 
-  // ---------------- LOAD BY DATE ----------------
-
   Future<void> _onLoadByDate(
     LoadSessionsByDateEvent event,
-    Emitter<BaseState<List<StudySession>>> emit,
+    Emitter<PlannerState> emit,
   ) async {
-    emitLoading(emit);
+    emit(state.copyWith(status: PlannerStatus.loading));
 
     final result = await getSessionsByDate(event.date);
 
     result.fold(
-      (failure) => emitFailure(emit, failure),
-      (sessions) => emitSuccess(emit, sessions),
+      (failure) => emit(
+        state.copyWith(
+          status: PlannerStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (sessions) => emit(
+        state.copyWith(status: PlannerStatus.success, sessions: sessions),
+      ),
     );
   }
 
-  // ---------------- CREATE ----------------
-
   Future<void> _onCreate(
     CreateSessionEvent event,
-    Emitter<BaseState<List<StudySession>>> emit,
+    Emitter<PlannerState> emit,
   ) async {
+    emit(state.copyWith(status: PlannerStatus.loading));
+
     final result = await createSession(event.session);
 
-    result.fold((failure) => emitFailure(emit, failure), (_) {
-      // ✅ ONLY reload data
-      add(LoadSessionsByUserEvent(event.session.userId));
-    });
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          status: PlannerStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (_) => add(LoadSessionsByUserEvent(event.session.userId)),
+    );
   }
-
-  // ---------------- UPDATE ----------------
 
   Future<void> _onUpdate(
     UpdateSessionEvent event,
-    Emitter<BaseState<List<StudySession>>> emit,
+    Emitter<PlannerState> emit,
   ) async {
+    emit(state.copyWith(status: PlannerStatus.loading));
+
     final result = await updateSession(event.session);
 
-    result.fold((failure) => emitFailure(emit, failure), (_) {
-      add(LoadSessionsByUserEvent(event.session.userId));
-    });
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          status: PlannerStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (_) => add(LoadSessionsByUserEvent(event.session.userId)),
+    );
   }
-
-  // ---------------- DELETE ----------------
 
   Future<void> _onDelete(
     DeleteSessionEvent event,
-    Emitter<BaseState<List<StudySession>>> emit,
+    Emitter<PlannerState> emit,
   ) async {
+    // Optimistic Update
+    final currentSessions = List<StudySession>.from(state.sessions);
+    currentSessions.removeWhere((s) => s.id == event.sessionId);
+    emit(
+      state.copyWith(status: PlannerStatus.success, sessions: currentSessions),
+    );
+
     final result = await deleteSession(event.sessionId);
 
     result.fold(
-      (failure) => emitFailure(emit, failure),
-      (_) => add(LoadSessionsByUserEvent(event.userId)),
+      (failure) => emit(
+        state.copyWith(
+          // Revert/Error
+          status: PlannerStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (_) => add(LoadSessionsByUserEvent(event.userId)), // Verify/Reload
     );
   }
 }

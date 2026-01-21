@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:smart_study_plan/features/subjects/presentation/bloc/subject_bloc.dart';
+import 'package:smart_study_plan/features/subjects/presentation/bloc/subject_event.dart';
 import 'package:smart_study_plan/features/reminder/domain/entities/reminder.dart';
 import 'package:smart_study_plan/features/reminder/presentation/bloc/reminder_bloc.dart';
 import 'package:smart_study_plan/features/reminder/presentation/bloc/reminder_event.dart';
 import 'package:smart_study_plan/features/reminder/presentation/bloc/reminder_state.dart';
+import 'package:smart_study_plan/core/widgets/skeletons/list_item_skeleton.dart';
 import 'package:smart_study_plan/features/reminder/presentation/widgets/reminder_tile.dart';
 
 class ReminderListPage extends StatefulWidget {
@@ -17,264 +19,283 @@ class ReminderListPage extends StatefulWidget {
 }
 
 class _ReminderListPageState extends State<ReminderListPage> {
-  static const _filterKey = 'reminder_filter';
-  String _filter = 'all';
+  String? _selectedSubjectId;
 
   @override
   void initState() {
     super.initState();
-    _loadFilter();
     context.read<ReminderBloc>().add(GetRemindersEvent(widget.userId));
-  }
-
-  Future<void> _loadFilter() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() => _filter = prefs.getString(_filterKey) ?? 'all');
-  }
-
-  Future<void> _saveFilter(String value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_filterKey, value);
-  }
-
-  void _changeFilter(String value) {
-    setState(() => _filter = value);
-    _saveFilter(value);
+    context.read<SubjectBloc>().add(LoadSubjectsEvent(widget.userId));
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Reminders'),
-        automaticallyImplyLeading: false,
-      ),
-      body: BlocBuilder<ReminderBloc, ReminderState>(
-        builder: (context, state) {
-          if (state is ReminderLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
+    final theme = Theme.of(context);
+    final subjectState = context.watch<SubjectBloc>().state;
+    final isFolderMode = _selectedSubjectId == null;
 
-          if (state is ReminderError) {
-            return Center(child: Text(state.message));
-          }
+    final subjectName = _selectedSubjectId == null
+        ? null
+        : subjectState.subjects
+              .where((s) => s.id == _selectedSubjectId)
+              .firstOrNull
+              ?.name;
 
-          if (state is RemindersLoaded) {
-            final reminders = state.reminders;
-            final filtered = _applyFilter(reminders);
+    return PopScope(
+      canPop: !(_selectedSubjectId != null),
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        setState(() => _selectedSubjectId = null);
+      },
+      child: Scaffold(
+        backgroundColor: theme.colorScheme.surface,
+        appBar: AppBar(
+          title: Text(
+            isFolderMode ? 'Reminders' : (subjectName ?? 'Reminders'),
+          ),
+          centerTitle: true,
+          leading: isFolderMode
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => setState(() => _selectedSubjectId = null),
+                ),
+        ),
+        body: BlocBuilder<ReminderBloc, ReminderState>(
+          builder: (context, state) {
+            // Loading
+            if (state.status == ReminderBlocStatus.loading &&
+                state.reminders.isEmpty) {
+              return ListView.separated(
+                padding: EdgeInsets.all(16.r),
+                itemCount: 5,
+                separatorBuilder: (_, index) => SizedBox(height: 12.h),
+                itemBuilder: (_, index) => const ListItemSkeleton(),
+              );
+            }
 
-            return CustomScrollView(
-              slivers: [
-                // 🧲 STICKY FILTER BAR
-                SliverPersistentHeader(
-                  pinned: true,
-                  delegate: _FilterHeader(
-                    reminders: reminders,
-                    selected: _filter,
-                    onChanged: _changeFilter,
+            // Failure
+            if (state.status == ReminderBlocStatus.failure &&
+                state.reminders.isEmpty) {
+              return Center(child: Text(state.errorMessage ?? 'Error'));
+            }
+
+            // Data
+            final allReminders = state.reminders;
+
+            if (isFolderMode) {
+              // 📂 SHOW FOLDER GRID (With count)
+              return _FolderGrid(
+                subjects: subjectState.subjects,
+                reminders: allReminders,
+                onFolderTap: (id) => setState(() => _selectedSubjectId = id),
+                onViewAll: () => setState(() => _selectedSubjectId = 'ALL'),
+              );
+            } else {
+              // 📋 SHOW LIST (Filtered)
+              final filtered = _selectedSubjectId == 'ALL'
+                  ? allReminders
+                  : _selectedSubjectId == 'UNCATEGORIZED'
+                  ? allReminders.where((r) => r.subjectId == null).toList()
+                  : allReminders
+                        .where((r) => r.subjectId == _selectedSubjectId)
+                        .toList();
+
+              if (filtered.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.notifications_off_outlined,
+                        size: 64,
+                        color: theme.disabledColor,
+                      ),
+                      const SizedBox(height: 16),
+                      const Text('No reminders found'),
+                    ],
                   ),
-                ),
+                );
+              }
 
-                // 📋 LIST
-                SliverPadding(
-                  padding: const EdgeInsets.all(16),
-                  sliver: filtered.isEmpty
-                      ? const SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: Center(child: Text('No reminders')),
-                        )
-                      : SliverList.separated(
-                          itemCount: filtered.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: 12),
-                          itemBuilder: (_, index) {
-                            final reminder = filtered[index];
-
-                            return Dismissible(
-                              key: ValueKey(reminder.id),
-                              direction: DismissDirection.endToStart,
-
-                              background: Container(
-                                alignment: Alignment.centerRight,
-                                padding: const EdgeInsets.only(right: 24),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.shade500,
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: const Icon(
-                                  Icons.delete_outline,
-                                  color: Colors.white,
-                                ),
-                              ),
-
-                              confirmDismiss: (_) async {
-                                context.read<ReminderBloc>().add(
-                                  DeleteReminderEvent(
-                                    reminder.id,
-                                    // widget.userId,
-                                  ),
-                                );
-
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Reminder deleted'),
-                                  ),
-                                );
-
-                                return true; // ✅ Let dismiss animation happen
-                              },
-
-                              child: ReminderTile(
-                                reminder: reminder,
-                                onToggle: (v) =>
-                                    context.read<ReminderBloc>().add(
-                                      ToggleReminderActiveEvent(reminder.id, v),
-                                    ),
-                              ),
-                            );
-                          },
-                        ),
-                ),
-              ],
-            );
-          }
-
-          return const SizedBox.shrink();
-        },
+              return _ReminderList(reminders: filtered);
+            }
+          },
+        ),
       ),
     );
-  }
-
-  List<Reminder> _applyFilter(List<Reminder> reminders) {
-    final now = DateTime.now();
-
-    switch (_filter) {
-      case 'upcoming':
-        return reminders
-            .where(
-              (r) =>
-                  r.isActive &&
-                  r.status == ReminderStatus.upcoming &&
-                  r.reminderTime.isAfter(now),
-            )
-            .toList();
-      case 'task':
-        return reminders.where((r) => r.reminderType == 'task').toList();
-      case 'session':
-        return reminders.where((r) => r.reminderType == 'session').toList();
-      default:
-        return reminders;
-    }
   }
 }
 
-class _FilterHeader extends SliverPersistentHeaderDelegate {
+class _ReminderList extends StatelessWidget {
   final List<Reminder> reminders;
-  final String selected;
-  final ValueChanged<String> onChanged;
 
-  _FilterHeader({
+  const _ReminderList({required this.reminders});
+
+  @override
+  Widget build(BuildContext context) {
+    if (reminders.isEmpty) {
+      return const Center(child: Text('No reminders set'));
+    }
+
+    return ListView.separated(
+      padding: EdgeInsets.all(16.r),
+      itemCount: reminders.length,
+      separatorBuilder: (context, index) => SizedBox(height: 16.h),
+      itemBuilder: (_, index) {
+        final reminder = reminders[index];
+        return Dismissible(
+          key: ValueKey(reminder.id),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            alignment: Alignment.centerRight,
+            padding: EdgeInsets.only(right: 28.w),
+            decoration: BoxDecoration(
+              color: Colors.red.shade400,
+              borderRadius: BorderRadius.circular(20.r),
+            ),
+            child: const Icon(Icons.delete_outline, color: Colors.white),
+          ),
+          onDismissed: (_) {
+            context.read<ReminderBloc>().add(DeleteReminderEvent(reminder.id));
+          },
+          child: ReminderTile(
+            reminder: reminder,
+            onToggle: (v) => context.read<ReminderBloc>().add(
+              ToggleReminderActiveEvent(reminder.id, v),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _FolderGrid extends StatelessWidget {
+  final List<dynamic> subjects;
+  final List<Reminder> reminders;
+  final ValueChanged<String> onFolderTap;
+  final VoidCallback onViewAll;
+
+  const _FolderGrid({
+    required this.subjects,
     required this.reminders,
-    required this.selected,
-    required this.onChanged,
+    required this.onFolderTap,
+    required this.onViewAll,
   });
 
-  int _count(String type) {
-    if (type == 'upcoming') {
-      return reminders
-          .where(
-            (r) =>
-                r.isActive &&
-                r.status == ReminderStatus.upcoming &&
-                r.reminderTime.isAfter(DateTime.now()),
-          )
-          .length;
+  Color _hexToColor(String hex) {
+    try {
+      final value = hex.replaceFirst('#', '');
+      return Color(int.parse('FF$value', radix: 16));
+    } catch (_) {
+      return Colors.blue;
     }
-    if (type == 'task') {
-      return reminders.where((r) => r.reminderType == 'task').length;
-    }
-    if (type == 'session') {
-      return reminders.where((r) => r.reminderType == 'session').length;
-    }
-    return reminders.length;
   }
 
   @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    final theme = Theme.of(context);
+  Widget build(BuildContext context) {
+    final uncategorizedCount = reminders
+        .where((r) => r.subjectId == null)
+        .length;
 
-    return Container(
-      color: theme.colorScheme.surface,
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        children: [
-          _chip(context, 'all', 'All', _count('all')),
-          _chip(context, 'upcoming', 'Upcoming', _count('upcoming')),
-          _chip(context, 'task', 'Tasks', _count('task')),
-          _chip(context, 'session', 'Sessions', _count('session')),
-        ],
+    return GridView(
+      padding: EdgeInsets.all(16.r),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 16.h,
+        crossAxisSpacing: 16.w,
+        childAspectRatio: 1.1,
       ),
+      children: [
+        // 'All Reminders' Card
+        _FolderCard(
+          title: 'All Reminders',
+          subtitle: '${reminders.length} total',
+          icon: Icons.all_inbox,
+          onTap: onViewAll,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+
+        // Uncategorized
+        if (uncategorizedCount > 0)
+          _FolderCard(
+            title: 'Uncategorized',
+            subtitle: '$uncategorizedCount reminders',
+            icon: Icons.help_outline_rounded,
+            onTap: () => onFolderTap('UNCATEGORIZED'),
+            color: Colors.grey,
+          ),
+
+        // Subject Folders
+        ...subjects.map((subject) {
+          final color = _hexToColor(subject.color);
+          final count = reminders
+              .where((r) => r.subjectId == subject.id)
+              .length;
+
+          return _FolderCard(
+            title: subject.name,
+            subtitle: '$count reminders',
+            icon: Icons.folder_special_rounded,
+            onTap: () => onFolderTap(subject.id),
+            color: color,
+          );
+        }),
+      ],
     );
   }
+}
 
-  Widget _chip(BuildContext context, String value, String label, int count) {
-    final theme = Theme.of(context);
-    final isSelected = value == selected;
+class _FolderCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color color;
 
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        selected: isSelected,
-        onSelected: (_) => onChanged(value),
-        label: Row(
-          mainAxisSize: MainAxisSize.min,
+  const _FolderCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24.r),
+      child: Container(
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(24.r),
+          border: Border.all(color: color.withValues(alpha: 0.2), width: 1.5),
+        ),
+        padding: EdgeInsets.all(16.r),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label),
-            if (count > 0) ...[
-              const SizedBox(width: 6),
-              CircleAvatar(
-                radius: 9,
-                backgroundColor: isSelected
-                    ? Colors.white
-                    : theme.colorScheme.primary,
-                child: Text(
-                  '$count',
-                  style: TextStyle(
-                    fontSize: 11,
+            Icon(icon, color: color, size: 32.sp),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: isSelected
-                        ? theme.colorScheme.primary
-                        : Colors.white,
                   ),
                 ),
-              ),
-            ],
+                Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
           ],
         ),
-        selectedColor: theme.colorScheme.primary,
-        backgroundColor: theme.colorScheme.surfaceContainerHighest,
-        labelStyle: TextStyle(
-          color: isSelected ? Colors.white : theme.colorScheme.onSurface,
-          fontWeight: FontWeight.w500,
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
     );
   }
-
-  @override
-  double get maxExtent => 56;
-
-  @override
-  double get minExtent => 56;
-
-  @override
-  bool shouldRebuild(covariant _FilterHeader oldDelegate) => true;
 }

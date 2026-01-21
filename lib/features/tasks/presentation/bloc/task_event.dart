@@ -7,10 +7,22 @@ abstract class TaskEvent extends BaseEvent {
 
 class LoadTasksBySubjectEvent extends TaskEvent {
   final String subjectId;
-  const LoadTasksBySubjectEvent(this.subjectId);
+  final String userId;
+  const LoadTasksBySubjectEvent({
+    required this.subjectId,
+    required this.userId,
+  });
 
   @override
-  List<Object?> get props => [subjectId];
+  List<Object?> get props => [subjectId, userId];
+}
+
+class LoadTasksByUserEvent extends TaskEvent {
+  final String userId;
+  const LoadTasksByUserEvent(this.userId);
+
+  @override
+  List<Object?> get props => [userId];
 }
 
 class CreateTaskEvent extends TaskEvent {

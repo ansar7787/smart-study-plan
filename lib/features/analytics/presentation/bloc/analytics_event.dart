@@ -62,9 +62,10 @@ class UpdateStudyGoalEvent extends AnalyticsEvent {
 
 class DeleteStudyGoalEvent extends AnalyticsEvent {
   final String goalId;
+  final String userId;
 
-  const DeleteStudyGoalEvent(this.goalId);
+  const DeleteStudyGoalEvent({required this.goalId, required this.userId});
 
   @override
-  List<Object?> get props => [goalId];
+  List<Object?> get props => [goalId, userId];
 }

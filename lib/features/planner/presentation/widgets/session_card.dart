@@ -1,12 +1,16 @@
+import 'dart:async' as java_timer;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../domain/entities/study_session.dart';
 
-class SessionCard extends StatelessWidget {
+class SessionCard extends StatefulWidget {
   final StudySession session;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final VoidCallback? onAddReminder;
+  final VoidCallback? onStart;
+  final String? subjectName;
+  final Color? subjectColor;
   final bool hasReminder;
 
   const SessionCard({
@@ -16,203 +20,248 @@ class SessionCard extends StatelessWidget {
     this.onEdit,
     this.onDelete,
     this.onAddReminder,
+    this.onStart,
+    this.subjectName,
+    this.subjectColor,
   });
+
+  @override
+  State<SessionCard> createState() => _SessionCardState();
+}
+
+class _SessionCardState extends State<SessionCard> {
+  late DateTime _now;
+  java_timer.Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _now = DateTime.now();
+    _startTimer();
+  }
+
+  void _startTimer() {
+    // Only need a timer if it's upcoming and within 16 mins (to be safe) or ongoing
+    if (_isPast) return;
+
+    _timer = java_timer.Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _now = DateTime.now();
+        });
+        if (_isPast) {
+          _timer?.cancel();
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  bool get _isPast => widget.session.endTime.isBefore(_now);
+
+  bool get _isOngoing =>
+      _now.isAfter(widget.session.startTime) &&
+      _now.isBefore(widget.session.endTime);
+
+  bool get _isUpcomingButSoon =>
+      widget.session.startTime.difference(_now).inMinutes <= 15 &&
+      widget.session.startTime.isAfter(_now);
+
+  String _formatCountdown() {
+    final diff = widget.session.startTime.difference(_now);
+    if (diff.isNegative) return "00:00";
+    final minutes = diff.inMinutes.toString().padLeft(2, '0');
+    final seconds = (diff.inSeconds % 60).toString().padLeft(2, '0');
+    return "$minutes:$seconds";
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final status = _status;
-    final statusColor = _statusColor(theme);
+    final colors = theme.colorScheme;
+    final subjectColor = widget.subjectColor ?? colors.secondary;
 
-    final timeRange =
-        '${DateFormat('h:mm a').format(session.startTime)}'
-        ' - ${DateFormat('h:mm a').format(session.endTime)}';
-
-    final duration = session.duration.inMinutes;
-
-    return Dismissible(
-      key: ValueKey(session.id),
-
-      // ⬅️ DELETE ONLY
-      direction: DismissDirection.endToStart,
-
-      // REQUIRED: background MUST exist if secondaryBackground exists
-      background: const SizedBox(),
-
-      secondaryBackground: _SwipeAction(
-        color: Colors.red,
-        icon: Icons.delete,
-        label: 'Delete',
-        alignment: Alignment.centerRight,
-      ),
-
-      confirmDismiss: (_) async {
-        onDelete?.call();
-        return true; // allow removal
-      },
-
-      child: InkWell(
-        onTap: onEdit,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: theme.dividerColor.withValues(alpha: 0.4),
-            ),
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: (_isOngoing ? colors.primary : colors.outline).withValues(
+            alpha: 0.1,
           ),
-          child: Row(
-            children: [
-              // STATUS BAR
-              Container(
-                width: 6,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: statusColor,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              const SizedBox(width: 12),
+          width: _isOngoing ? 2 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: widget.onEdit,
+        borderRadius: BorderRadius.circular(20),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 🎨 Subject Color Stripe
+                Container(width: 6, color: subjectColor),
 
-              // CONTENT
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      session.title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '$timeRange • $duration min',
-                      style: theme.textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 10),
-                    _StatusChip(label: status, color: statusColor),
-                  ],
-                ),
-              ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 🏷️ Header: Subject + Time
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                widget.subjectName ?? 'Independent Study',
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: subjectColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Text(
+                              DateFormat(
+                                'HH:mm',
+                              ).format(widget.session.startTime),
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
 
-              // 🔔 REMINDER ACTION
-              IconButton(
-                icon: Icon(
-                  hasReminder
-                      ? Icons.notifications_active
-                      : Icons.notifications_none,
-                  color: hasReminder
-                      ? theme.colorScheme.primary
-                      : theme.iconTheme.color,
+                        // 📝 Title
+                        Text(
+                          widget.session.title,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: _isPast ? colors.outline : colors.onSurface,
+                            decoration: _isPast
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
+                        ),
+
+                        if (widget.session.description.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            widget.session.description,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+
+                        const SizedBox(height: 12),
+
+                        // ⚡ Actions & Status
+                        Row(
+                          children: [
+                            if (_isOngoing)
+                              _StatusBadge(
+                                label: 'ONGOING',
+                                color: colors.primary,
+                              )
+                            else if (_isPast)
+                              const _StatusBadge(
+                                label: 'COMPLETED',
+                                color: Colors.grey,
+                              )
+                            else if (_isUpcomingButSoon)
+                              _StatusBadge(
+                                label: 'STARTS IN ${_formatCountdown()}',
+                                color: colors.tertiary,
+                              ),
+
+                            const Spacer(),
+
+                            // Start Timer Button
+                            if (_isOngoing)
+                              IconButton.filledTonal(
+                                onPressed: widget.onStart,
+                                iconSize: 20,
+                                icon: const Icon(Icons.play_arrow_rounded),
+                                tooltip: 'Start Session',
+                              ),
+
+                            // Reminder Button
+                            IconButton(
+                              onPressed: widget.onAddReminder,
+                              iconSize: 20,
+                              icon: Icon(
+                                widget.hasReminder
+                                    ? Icons.notifications_active_rounded
+                                    : Icons.notifications_none_rounded,
+                              ),
+                              color: widget.hasReminder
+                                  ? Colors.orange
+                                  : colors.outline,
+                            ),
+
+                            // Delete Button
+                            IconButton(
+                              onPressed: widget.onDelete,
+                              iconSize: 20,
+                              icon: const Icon(Icons.delete_outline_rounded),
+                              color: colors.error,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                onPressed: hasReminder ? null : onAddReminder,
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
-
-  // ---------- STATUS LOGIC ----------
-
-  bool get _isPast => session.endTime.isBefore(DateTime.now());
-
-  bool get _isOngoing =>
-      DateTime.now().isAfter(session.startTime) &&
-      DateTime.now().isBefore(session.endTime);
-
-  String get _status {
-    if (_isOngoing) return 'Ongoing';
-    if (_isPast) return 'Completed';
-    return 'Upcoming';
-  }
-
-  Color _statusColor(ThemeData theme) {
-    if (_isOngoing) return theme.colorScheme.secondary;
-    if (_isPast) return theme.disabledColor;
-    return theme.colorScheme.primary;
-  }
 }
 
-class _SwipeAction extends StatelessWidget {
-  final Color color;
-  final IconData icon;
+class _StatusBadge extends StatelessWidget {
   final String label;
-  final Alignment alignment;
+  final Color color;
 
-  const _SwipeAction({
-    required this.color,
-    required this.icon,
-    required this.label,
-    required this.alignment,
-  });
+  const _StatusBadge({required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      alignment: alignment,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: alignment == Alignment.centerLeft
-            ? [
-                Icon(icon, color: Colors.white),
-                const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ]
-            : [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Icon(icon, color: Colors.white),
-              ],
-      ),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  final String label;
-  final Color color;
-
-  const _StatusChip({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
         label,
         style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
           color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
         ),
       ),
     );

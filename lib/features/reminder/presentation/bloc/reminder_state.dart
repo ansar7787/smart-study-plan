@@ -1,17 +1,31 @@
-import 'package:smart_study_plan/features/reminder/domain/entities/reminder.dart';
+import 'package:equatable/equatable.dart';
+import '../../domain/entities/reminder.dart';
 
-abstract class ReminderState {}
+enum ReminderBlocStatus { initial, loading, success, failure }
 
-class ReminderInitial extends ReminderState {}
-
-class ReminderLoading extends ReminderState {}
-
-class RemindersLoaded extends ReminderState {
+class ReminderState extends Equatable {
+  final ReminderBlocStatus status;
   final List<Reminder> reminders;
-  RemindersLoaded(this.reminders);
-}
+  final String? errorMessage;
 
-class ReminderError extends ReminderState {
-  final String message;
-  ReminderError(this.message);
+  const ReminderState({
+    this.status = ReminderBlocStatus.initial,
+    this.reminders = const [],
+    this.errorMessage,
+  });
+
+  ReminderState copyWith({
+    ReminderBlocStatus? status,
+    List<Reminder>? reminders,
+    String? errorMessage,
+  }) {
+    return ReminderState(
+      status: status ?? this.status,
+      reminders: reminders ?? this.reminders,
+      errorMessage: errorMessage,
+    );
+  }
+
+  @override
+  List<Object?> get props => [status, reminders, errorMessage];
 }

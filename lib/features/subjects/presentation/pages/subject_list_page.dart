@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:smart_study_plan/config/routes/app_routes.dart';
-import 'package:smart_study_plan/core/bloc/base_state.dart';
-import 'package:smart_study_plan/core/bloc/view_state.dart';
-
-import '../../domain/entities/subject.dart';
 import '../bloc/subject_bloc.dart';
 import '../bloc/subject_event.dart';
+import '../bloc/subject_state.dart';
 import '../widgets/subject_card.dart';
+import 'package:smart_study_plan/core/widgets/skeletons/list_item_skeleton.dart';
 
 class SubjectListPage extends StatefulWidget {
   final String userId;
@@ -35,24 +34,35 @@ class _SubjectListPageState extends State<SubjectListPage> {
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(title: const Text('Subjects')),
 
-      body: BlocBuilder<SubjectBloc, BaseState<List<Subject>>>(
+      body: BlocBuilder<SubjectBloc, SubjectState>(
         builder: (context, state) {
-          final viewState = state.viewState;
-
-          if (viewState is ViewInitial || viewState is ViewLoading) {
-            return const Center(child: CircularProgressIndicator());
+          if (state.status == SubjectStatus.loading && state.subjects.isEmpty) {
+            return Scaffold(
+              body: Padding(
+                padding: EdgeInsets.symmetric(vertical: 20.h),
+                child: Column(
+                  children: const [
+                    ListItemSkeleton(),
+                    ListItemSkeleton(),
+                    ListItemSkeleton(),
+                    ListItemSkeleton(),
+                    ListItemSkeleton(),
+                  ],
+                ),
+              ),
+            );
           }
 
-          if (viewState is ViewFailure<List<Subject>>) {
+          if (state.status == SubjectStatus.failure && state.subjects.isEmpty) {
             return Center(
               child: Text(
-                viewState.message,
+                state.errorMessage ?? 'Failed to load',
                 style: const TextStyle(color: Colors.red),
               ),
             );
           }
 
-          final subjects = (viewState as ViewSuccess<List<Subject>>).data;
+          final subjects = state.subjects;
 
           return CustomScrollView(
             slivers: [
@@ -72,10 +82,10 @@ class _SubjectListPageState extends State<SubjectListPage> {
                 )
               else
                 SliverPadding(
-                  padding: const EdgeInsets.only(bottom: 24),
+                  padding: EdgeInsets.only(bottom: 24.h),
                   sliver: SliverList.separated(
                     itemCount: subjects.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 6),
+                    separatorBuilder: (_, _) => SizedBox(height: 6.h),
                     itemBuilder: (context, index) {
                       final subject = subjects[index];
 
@@ -146,11 +156,11 @@ class _SubjectHeader extends StatelessWidget {
     final colors = theme.colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 12.h),
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.all(18.r),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(22.r),
           gradient: LinearGradient(
             colors: [
               colors.primary.withValues(alpha: 0.10),
@@ -169,13 +179,15 @@ class _SubjectHeader extends StatelessWidget {
                     'Your Subjects',
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w700,
+                      fontSize: 22.sp,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: 6.h),
                   Text(
                     '$subjectCount subject${subjectCount == 1 ? '' : 's'}',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: colors.onSurface.withValues(alpha: 0.65),
+                      fontSize: 14.sp,
                     ),
                   ),
                 ],
@@ -184,19 +196,16 @@ class _SubjectHeader extends StatelessWidget {
 
             InkWell(
               onTap: onAdd,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(14.r),
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
+                padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
                 decoration: BoxDecoration(
                   color: colors.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(14.r),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.add, size: 18, color: colors.primary),
+                    Icon(Icons.add, size: 18.sp, color: colors.primary),
                     const SizedBox(width: 6),
                     Text(
                       'Add',
@@ -226,11 +235,11 @@ class _EmptySubjectState extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(28),
+        padding: EdgeInsets.all(28.r),
         child: Container(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(24.r),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(26),
+            borderRadius: BorderRadius.circular(26.r),
             gradient: LinearGradient(
               colors: [
                 colors.primary.withValues(alpha: 0.08),
@@ -243,23 +252,29 @@ class _EmptySubjectState extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               CircleAvatar(
-                radius: 36,
+                radius: 36.r,
                 backgroundColor: colors.primary.withValues(alpha: 0.12),
-                child: Icon(Icons.menu_book, size: 34, color: colors.primary),
+                child: Icon(
+                  Icons.menu_book,
+                  size: 34.sp,
+                  color: colors.primary,
+                ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16.h),
               Text(
                 'No subjects yet',
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w700,
+                  fontSize: 22.sp,
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8.h),
               Text(
                 'Create subjects to organize your\nstudy plan efficiently',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: colors.onSurface.withValues(alpha: 0.7),
+                  fontSize: 14.sp,
                 ),
               ),
             ],

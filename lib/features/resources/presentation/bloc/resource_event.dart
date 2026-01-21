@@ -1,9 +1,12 @@
 import 'dart:io';
-import '../../../../core/bloc/base_event.dart';
+import 'package:equatable/equatable.dart';
 import '../../domain/entities/file_resource.dart';
 
-abstract class ResourceEvent extends BaseEvent {
+abstract class ResourceEvent extends Equatable {
   const ResourceEvent();
+
+  @override
+  List<Object?> get props => [];
 }
 
 /// Load all resources for a user

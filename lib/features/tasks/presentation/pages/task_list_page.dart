@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:smart_study_plan/core/alarm/alarm_service.dart';
-import 'package:smart_study_plan/core/bloc/base_state.dart';
-import 'package:smart_study_plan/core/bloc/view_state.dart';
 import 'package:smart_study_plan/config/routes/app_routes.dart';
 
+import 'package:smart_study_plan/core/widgets/skeletons/list_item_skeleton.dart';
 import 'package:smart_study_plan/features/reminder/domain/entities/reminder.dart';
 import 'package:smart_study_plan/features/reminder/presentation/bloc/reminder_bloc.dart';
 import 'package:smart_study_plan/features/reminder/presentation/bloc/reminder_event.dart';
@@ -17,6 +17,7 @@ import 'package:smart_study_plan/features/reminder/presentation/bloc/reminder_st
 import '../../domain/entities/task.dart';
 import '../bloc/task_bloc.dart';
 import '../bloc/task_event.dart';
+import '../bloc/task_state.dart';
 import '../widgets/task_card.dart';
 
 class TaskListPage extends StatefulWidget {
@@ -40,7 +41,12 @@ class _TaskListPageState extends State<TaskListPage> {
   void initState() {
     super.initState();
 
-    context.read<TaskBloc>().add(LoadTasksBySubjectEvent(widget.subjectId));
+    context.read<TaskBloc>().add(
+      LoadTasksBySubjectEvent(
+        subjectId: widget.subjectId,
+        userId: widget.userId,
+      ),
+    );
 
     context.read<ReminderBloc>().add(GetRemindersEvent(widget.userId));
   }
@@ -53,25 +59,54 @@ class _TaskListPageState extends State<TaskListPage> {
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(title: Text(widget.subjectName)),
 
-      body: BlocBuilder<TaskBloc, BaseState<List<Task>>>(
-        builder: (context, taskState) {
-          final viewState = taskState.viewState;
-
-          if (viewState is ViewInitial || viewState is ViewLoading) {
-            return const Center(child: CircularProgressIndicator());
+      body: BlocBuilder<TaskBloc, TaskState>(
+        builder: (context, state) {
+          if (state.status == TaskStatus.loading && state.tasks.isEmpty) {
+            return Scaffold(
+              body: Padding(
+                padding: EdgeInsets.symmetric(vertical: 20.h),
+                child: Column(
+                  children: const [
+                    ListItemSkeleton(),
+                    ListItemSkeleton(),
+                    ListItemSkeleton(),
+                    ListItemSkeleton(),
+                  ],
+                ),
+              ),
+            );
           }
 
-          if (viewState is ViewFailure<List<Task>>) {
-            return Center(child: Text(viewState.message));
+          if (state.status == TaskStatus.failure && state.tasks.isEmpty) {
+            return Center(
+              child: Text(state.errorMessage ?? 'Error loading tasks'),
+            );
           }
 
-          final tasks = (viewState as ViewSuccess<List<Task>>).data;
+          if (state.tasks.where((t) => !t.isCompleted).isEmpty &&
+              state.tasks.isNotEmpty) {
+            // If all tasks are completed, show empty state or a special "All done" state?
+            // For now, let's just use the empty state but maybe tweak text if we wanted.
+            // Using standard empty state for simplicity as per "automatic delete" req.
+            return _EmptyTaskState(onAdd: _openCreateTask);
+          }
+
+          if (state.tasks.isEmpty) {
+            return _EmptyTaskState(onAdd: _openCreateTask);
+          }
 
           return BlocBuilder<ReminderBloc, ReminderState>(
             builder: (context, reminderState) {
-              final reminders = reminderState is RemindersLoaded
+              final reminders =
+                  reminderState.status == ReminderBlocStatus.success
                   ? reminderState.reminders
                   : <Reminder>[];
+
+              final activeTasks = state.tasks
+                  .where((t) => !t.isCompleted)
+                  .toList();
+              // Sort by due date (optional but good)
+              activeTasks.sort((a, b) => a.dueDate.compareTo(b.dueDate));
 
               final reminderTaskIds = reminders
                   .where(
@@ -89,63 +124,66 @@ class _TaskListPageState extends State<TaskListPage> {
                   SliverToBoxAdapter(
                     child: _TaskHeader(
                       subjectName: widget.subjectName,
-                      taskCount: tasks.length,
+                      taskCount: activeTasks.length, // Show active count
                       onAddTask: _openCreateTask,
                     ),
                   ),
 
                   /// 📋 TASK LIST / EMPTY STATE
                   SliverPadding(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    sliver: tasks.isEmpty
-                        ? SliverFillRemaining(
-                            hasScrollBody: false,
-                            child: _EmptyTaskState(onAdd: _openCreateTask),
-                          )
-                        : SliverList.separated(
-                            itemCount: tasks.length,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(height: 4),
-                            itemBuilder: (_, index) {
-                              final task = tasks[index];
-                              final hasReminder = reminderTaskIds.contains(
-                                task.id,
-                              );
+                    padding: EdgeInsets.only(bottom: 24.h),
+                    sliver: SliverList.separated(
+                      itemCount: activeTasks.length,
+                      separatorBuilder: (_, _) => SizedBox(height: 12.h),
+                      itemBuilder: (_, index) {
+                        final task = activeTasks[index];
+                        final hasReminder = reminderTaskIds.contains(task.id);
 
-                              return TaskCard(
-                                task: task,
-                                hasReminder: hasReminder,
+                        return TaskCard(
+                          task: task,
+                          hasReminder: hasReminder,
+                          onToggle: () {
+                            final taskBloc = context.read<TaskBloc>();
+                            taskBloc.add(ToggleTaskEvent(task));
 
-                                // ✅ REQUIRED FIX
-                                onToggle: () {
-                                  context.read<TaskBloc>().add(
-                                    ToggleTaskEvent(task),
-                                  );
-
-                                  // stop alarm if completed
-                                  if (!task.isCompleted) {
-                                    AlarmService.instance.stopTaskAlarm(
-                                      task.id,
+                            // Show Undo Snackbar
+                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text('Task completed'),
+                                action: SnackBarAction(
+                                  label: 'Undo',
+                                  onPressed: () {
+                                    // FORCE set to incomplete to "undo" the completion
+                                    taskBloc.add(
+                                      UpdateTaskEvent(
+                                        task.copyWith(isCompleted: false),
+                                      ),
                                     );
-                                    context.read<ReminderBloc>().add(
-                                      MarkReminderDoneByTaskEvent(task.id),
-                                    );
-                                  }
-                                },
-
-                                onEdit: () => context.pushNamed(
-                                  AppRouteNames.taskForm,
-                                  extra: task,
+                                  },
                                 ),
+                              ),
+                            );
 
-                                onDelete: () => _deleteTask(context, task),
-
-                                onAddReminder: hasReminder
-                                    ? null
-                                    : () => _createTaskReminder(task),
+                            // stop alarm if completed
+                            if (!task.isCompleted) {
+                              AlarmService.instance.stopTaskAlarm(task.id);
+                              context.read<ReminderBloc>().add(
+                                MarkReminderDoneByTaskEvent(task.id),
                               );
-                            },
+                            }
+                          },
+                          onEdit: () => context.pushNamed(
+                            AppRouteNames.taskForm,
+                            extra: task,
                           ),
+                          onDelete: () => _deleteTask(context, task),
+                          onAddReminder: hasReminder
+                              ? null
+                              : () => _createTaskReminder(task),
+                        );
+                      },
+                    ),
                   ),
                 ],
               );
@@ -189,9 +227,12 @@ class _TaskListPageState extends State<TaskListPage> {
       return;
     }
 
+    final newReminderId = const Uuid().v4();
+
     await AlarmService.instance.scheduleTaskAlarm(
       taskId: task.id,
       taskTitle: task.title,
+      reminderId: newReminderId,
       reminderTime: reminderTime,
     );
 
@@ -200,10 +241,11 @@ class _TaskListPageState extends State<TaskListPage> {
     context.read<ReminderBloc>().add(
       CreateReminderEvent(
         Reminder(
-          id: const Uuid().v4(),
+          id: newReminderId,
           userId: widget.userId,
           taskId: task.id,
           sessionId: null,
+          subjectId: widget.subjectId,
           title: task.title,
           description: task.description,
           reminderTime: reminderTime,
@@ -246,74 +288,95 @@ class _TaskHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          gradient: LinearGradient(
-            colors: [
-              colors.primary.withValues(alpha: 0.10),
-              colors.secondary.withValues(alpha: 0.06),
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(24.w, 24.h, 24.w, 32.h),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32.r)),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: 0.05),
+            blurRadius: 20.r,
+            offset: Offset(0, 10.h),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // 🔙 BACK BUTTON
+              IconButton.filledTonal(
+                onPressed: () => context.pop(),
+                icon: const Icon(Icons.arrow_back),
+                style: IconButton.styleFrom(
+                  backgroundColor: colors.surfaceContainerHighest,
+                ),
+              ),
+
+              // ➕ ADD BUTTON
+              ElevatedButton.icon(
+                onPressed: onAddTask,
+                icon: const Icon(Icons.add),
+                label: const Text('Add Task'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colors.primary,
+                  foregroundColor: colors.onPrimary,
+                  elevation: 0,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 20.w,
+                    vertical: 12.h,
+                  ),
+                ),
+              ),
             ],
           ),
-          border: Border.all(color: colors.primary.withValues(alpha: 0.12)),
-        ),
-        child: Row(
-          children: [
-            /// 📘 TITLE
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    subjectName,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '$taskCount task${taskCount == 1 ? '' : 's'}',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colors.onSurface.withValues(alpha: 0.7),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          const SizedBox(height: 24),
 
-            /// ➕ SOFT ADD ACTION
-            InkWell(
-              onTap: onAddTask,
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
+          // 📁 FOLDER INFO
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(12.r),
                 decoration: BoxDecoration(
-                  color: colors.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
+                  color: colors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16.r),
                 ),
-                child: Row(
+                child: Icon(
+                  Icons.folder_open,
+                  size: 32.sp,
+                  color: colors.primary,
+                ),
+              ),
+              SizedBox(width: 16.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.add, size: 18, color: colors.primary),
-                    const SizedBox(width: 6),
                     Text(
-                      'Add',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: colors.primary,
-                        fontWeight: FontWeight.w600,
+                      subjectName,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: colors.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$taskCount active tasks',
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: colors.onSurfaceVariant,
+                        fontSize: 16.sp,
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -335,13 +398,13 @@ class _EmptyTaskState extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(28),
+        padding: EdgeInsets.all(28.r),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // 🌈 ICON CONTAINER
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: EdgeInsets.all(24.r),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
@@ -351,10 +414,10 @@ class _EmptyTaskState extends StatelessWidget {
                   ],
                 ),
               ),
-              child: Icon(Icons.task_alt, size: 64, color: colors.primary),
+              child: Icon(Icons.task_alt, size: 64.sp, color: colors.primary),
             ),
 
-            const SizedBox(height: 24),
+            SizedBox(height: 24.h),
 
             Text(
               'No tasks yet',
@@ -380,12 +443,9 @@ class _EmptyTaskState extends StatelessWidget {
               icon: const Icon(Icons.add),
               label: const Text('Create your first task'),
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 22,
-                  vertical: 14,
-                ),
+                padding: EdgeInsets.symmetric(horizontal: 22.w, vertical: 14.h),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(14.r),
                 ),
               ),
             ),

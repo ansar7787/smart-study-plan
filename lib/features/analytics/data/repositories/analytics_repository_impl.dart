@@ -64,9 +64,16 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
       return Right(
         AnalyticsOverview(
           snapshot: cached.snapshot.toEntity(),
+          todaySnapshot: cached.todaySnapshot.toEntity(), // ✅ NEW
           trends: cached.trends.toEntity(),
           activeGoals: const [],
           insights: cached.insights.map((i) => i.toEntity()).toList(),
+          subjectDistribution: const {}, // ✅ Fallback for cache
+          taskDistribution: const {}, // ✅ Fallback for cache
+          studyHeatmap: const {}, // ✅ Fallback
+          averageSessionDuration: 0,
+          bestFocusHour: 9,
+          totalPoints: 0,
         ),
       );
     }
@@ -148,9 +155,9 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
     );
 
     final aiInsightResult = await analyticsAiService.generateInsight(
+      userId,
       summaryText,
     );
-
     final aiInsights = aiInsightResult.fold(
       (_) => <AnalyticsInsight>[],
       (text) => [
@@ -191,6 +198,9 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
 
     await localDataSource.saveOverview(
       snapshot: ProgressSnapshotModel.fromEntity(overview.snapshot),
+      todaySnapshot: ProgressSnapshotModel.fromEntity(
+        overview.todaySnapshot,
+      ), // ✅ NEW
       trends: ProgressTrendsModel.fromEntity(overview.trends),
       insights: mergedInsights
           .map((i) => AnalyticsInsightModel.fromEntity(i))

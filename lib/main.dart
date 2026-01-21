@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:alarm/alarm.dart';
+import 'package:smart_study_plan/config/routes/app_routes.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-import 'package:smart_study_plan/config/ai/ai_config.dart';
-import 'package:smart_study_plan/config/routes/app_routes.dart';
 import 'package:smart_study_plan/config/theme/app_theme.dart';
+import 'package:smart_study_plan/config/theme/bloc/theme_cubit.dart';
 import 'package:smart_study_plan/core/alarm/alarm_service.dart';
-import 'package:smart_study_plan/core/utils/permission_handler.dart';
 import 'package:smart_study_plan/di/service_locator.dart';
 
 import 'package:smart_study_plan/features/admin_panel/presentation/bloc/admin_users/admin_users_bloc.dart';
@@ -18,21 +19,67 @@ import 'package:smart_study_plan/features/resources/presentation/bloc/resource_b
 import 'package:smart_study_plan/features/subjects/presentation/bloc/subject_bloc.dart';
 import 'package:smart_study_plan/features/tasks/presentation/bloc/task_bloc.dart';
 import 'package:smart_study_plan/features/user_management/presentation/bloc/user_bloc.dart';
+import 'package:smart_study_plan/features/onboarding/presentation/bloc/onboarding_bloc.dart';
+
+import 'dart:async';
+import 'package:smart_study_plan/core/utils/logger.dart';
+import 'package:go_router/go_router.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
 
-  await AlarmService.instance.init();
-  await askNotificationPermission();
-  await setupServiceLocator();
+      // 📱 Enable Edge-to-Edge (Full Screen)
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
-  debugPrint('AI key loaded: ${AiConfig.openAiKey.isNotEmpty}');
+      await AlarmService.instance.init();
+      await setupServiceLocator();
 
-  runApp(const MyApp());
+      runApp(const MyApp());
+    },
+    (error, stack) {
+      AppLogger.e('Unhandled Exception caught in main zone', error, stack);
+    },
+  );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late final UserBloc _userBloc;
+  late final GoRouter _router;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // 1️⃣ Initialize User Bloc
+    _userBloc = getIt<UserBloc>()..add(const CheckAuthStatusEvent());
+
+    // 2️⃣ Create Router with Auth Listener
+    _router = createAppRouter(_userBloc);
+
+    // 🎧 Listen to Alarm Ring Stream
+    Alarm.ringing.listen((alarmSet) {
+      if (alarmSet.alarms.isNotEmpty) {
+        final settings = alarmSet.alarms.last;
+        debugPrint('🔔 Alarm ringing: ${settings.id}');
+        _router.pushNamed(AppRouteNames.alarmRing, extra: settings);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _userBloc.close();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,10 +90,8 @@ class MyApp extends StatelessWidget {
       builder: (_, _) {
         return MultiBlocProvider(
           providers: [
-            BlocProvider(
-              create: (_) =>
-                  getIt<UserBloc>()..add(const CheckAuthStatusEvent()),
-            ),
+            // ✅ Use .value since we created it in initState
+            BlocProvider.value(value: _userBloc),
             BlocProvider(create: (_) => getIt<AdminUsersBloc>()),
             BlocProvider(create: (_) => getIt<SubjectBloc>()),
             BlocProvider(create: (_) => getIt<TaskBloc>()),
@@ -55,12 +100,23 @@ class MyApp extends StatelessWidget {
             BlocProvider(create: (_) => getIt<ReminderBloc>()),
             BlocProvider(create: (_) => getIt<AnalyticsBloc>()),
             BlocProvider(create: (_) => getIt<KnowledgeBloc>()),
+            BlocProvider(create: (_) => getIt<ThemeCubit>()), // 🌓 Theme Cubit
+            BlocProvider(
+              create: (_) =>
+                  getIt<OnboardingBloc>()..add(const CheckOnboardingStatus()),
+            ),
           ],
-          child: MaterialApp.router(
-            title: 'Smart Study Planner',
-            theme: AppTheme.light,
-            routerConfig: appRouter,
-            debugShowCheckedModeBanner: false,
+          child: BlocBuilder<ThemeCubit, ThemeMode>(
+            builder: (context, themeMode) {
+              return MaterialApp.router(
+                title: 'Smart Study Planner',
+                theme: AppTheme.light,
+                darkTheme: AppTheme.dark, // 🌑 Dark Theme
+                themeMode: themeMode,
+                routerConfig: _router,
+                debugShowCheckedModeBanner: false,
+              );
+            },
           ),
         );
       },

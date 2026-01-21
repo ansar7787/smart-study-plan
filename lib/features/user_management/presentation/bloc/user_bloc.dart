@@ -1,3 +1,5 @@
+// ignore_for_file: invalid_use_of_visible_for_testing_member, undefined_constructor_in_object_creation
+
 import 'dart:io';
 
 import 'package:bloc/bloc.dart';
@@ -30,7 +32,7 @@ class UserBloc extends Bloc<UserEvent, UserState> {
     required this.logoutUserUseCase,
     required this.updateUserUseCase,
     required this.uploadUserAvatarUseCase,
-  }) : super(const UserInitial()) {
+  }) : super(const UserState()) {
     on<RegisterUserEvent>(_onRegisterUser);
     on<LoginUserEvent>(_onLoginUser);
     on<LogoutEvent>(_onLogout);
@@ -41,12 +43,16 @@ class UserBloc extends Bloc<UserEvent, UserState> {
   }
 
   /* ───────────────── AUTH ───────────────── */
-
   Future<void> _onRegisterUser(
     RegisterUserEvent event,
     Emitter<UserState> emit,
   ) async {
-    emit(const UserLoading(message: 'Creating account...'));
+    emit(
+      state.copyWith(
+        status: UserStatus.loading,
+        loadingMessage: 'Creating account...',
+      ),
+    );
 
     final result = await registerUserUseCase(
       RegisterUserParams(
@@ -57,8 +63,14 @@ class UserBloc extends Bloc<UserEvent, UserState> {
     );
 
     result.fold(
-      (failure) => emit(UserError(failure.message)),
-      (user) => emit(UserAuthenticated(user)),
+      (failure) => emit(
+        state.copyWith(
+          status: UserStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (user) =>
+          emit(state.copyWith(status: UserStatus.authenticated, user: user)),
     );
   }
 
@@ -66,31 +78,52 @@ class UserBloc extends Bloc<UserEvent, UserState> {
     LoginUserEvent event,
     Emitter<UserState> emit,
   ) async {
-    emit(const UserLoading(message: 'Logging in...'));
+    emit(
+      state.copyWith(
+        status: UserStatus.loading,
+        loadingMessage: 'Logging in...',
+      ),
+    );
 
     final result = await loginUserUseCase(
       LoginUserParams(email: event.email, password: event.password),
     );
 
     result.fold(
-      (failure) => emit(UserError(failure.message)),
-      (user) => emit(UserAuthenticated(user)),
+      (failure) => emit(
+        state.copyWith(
+          status: UserStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (user) =>
+          emit(state.copyWith(status: UserStatus.authenticated, user: user)),
     );
   }
 
   Future<void> _onLogout(LogoutEvent event, Emitter<UserState> emit) async {
-    emit(const UserLoading(message: 'Logging out...'));
+    emit(
+      state.copyWith(
+        status: UserStatus.loading,
+        loadingMessage: 'Logging out...',
+      ),
+    );
 
     final result = await logoutUserUseCase(const NoParams());
 
     result.fold(
       (failure) {
         AppLogger.e('Logout failed: ${failure.message}');
-        emit(UserError(failure.message));
+        emit(
+          state.copyWith(
+            status: UserStatus.failure,
+            errorMessage: failure.message,
+          ),
+        );
       },
       (_) {
         AppLogger.d('Logout successful');
-        emit(const UserLoggedOut());
+        emit(const UserState(status: UserStatus.unauthenticated));
       },
     );
   }
@@ -101,34 +134,49 @@ class UserBloc extends Bloc<UserEvent, UserState> {
     CheckAuthStatusEvent event,
     Emitter<UserState> emit,
   ) async {
-    emit(const UserLoading(message: 'Checking authentication...'));
-
+    // Keep internal loading silent or show initial splash
     final result = await getCurrentUserUseCase(const NoParams());
 
-    result.fold((_) => emit(const UserNotAuthenticated()), (user) {
-      if (user == null) {
-        emit(const UserNotAuthenticated());
-      } else {
-        emit(UserAuthenticated(user));
-      }
-    });
+    result.fold(
+      (_) => emit(state.copyWith(status: UserStatus.unauthenticated)),
+      (user) async {
+        if (user == null) {
+          emit(state.copyWith(status: UserStatus.unauthenticated));
+        } else {
+          emit(state.copyWith(status: UserStatus.authenticated, user: user));
+        }
+      },
+    );
   }
 
   Future<void> _onGetCurrentUser(
     GetCurrentUserEvent event,
     Emitter<UserState> emit,
   ) async {
-    emit(const UserLoading(message: 'Loading user...'));
+    emit(
+      state.copyWith(
+        status: UserStatus.loading,
+        loadingMessage: 'Loading user...',
+      ),
+    );
 
     final result = await getCurrentUserUseCase(const NoParams());
 
-    result.fold((failure) => emit(UserError(failure.message)), (user) {
-      if (user == null) {
-        emit(const UserNotAuthenticated());
-      } else {
-        emit(UserAuthenticated(user));
-      }
-    });
+    result.fold(
+      (failure) => emit(
+        state.copyWith(
+          status: UserStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (user) {
+        if (user == null) {
+          emit(state.copyWith(status: UserStatus.unauthenticated));
+        } else {
+          emit(state.copyWith(status: UserStatus.authenticated, user: user));
+        }
+      },
+    );
   }
 
   /* ───────────────── PROFILE UPDATE ───────────────── */
@@ -137,14 +185,24 @@ class UserBloc extends Bloc<UserEvent, UserState> {
     UpdateUserEvent event,
     Emitter<UserState> emit,
   ) async {
-    if (state is! UserAuthenticated) {
-      emit(const UserError('User not authenticated'));
+    if (state.user == null) {
+      emit(
+        state.copyWith(
+          status: UserStatus.failure,
+          errorMessage: 'User not authenticated',
+        ),
+      );
       return;
     }
 
-    final currentUser = (state as UserAuthenticated).user;
+    final currentUser = state.user!;
 
-    emit(const UserLoading(message: 'Updating profile...'));
+    emit(
+      state.copyWith(
+        status: UserStatus.loading,
+        loadingMessage: 'Updating profile...',
+      ),
+    );
 
     final updatedUser = currentUser.copyWith(
       name: event.name,
@@ -155,8 +213,14 @@ class UserBloc extends Bloc<UserEvent, UserState> {
     final result = await updateUserUseCase(updatedUser);
 
     result.fold(
-      (failure) => emit(UserError(failure.message)),
-      (user) => emit(UserAuthenticated(user)),
+      (failure) => emit(
+        state.copyWith(
+          status: UserStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
+      (user) =>
+          emit(state.copyWith(status: UserStatus.authenticated, user: user)),
     );
   }
 
@@ -166,14 +230,24 @@ class UserBloc extends Bloc<UserEvent, UserState> {
     UpdateUserAvatarEvent event,
     Emitter<UserState> emit,
   ) async {
-    if (state is! UserAuthenticated) {
-      emit(const UserError('User not authenticated'));
+    if (state.user == null) {
+      emit(
+        state.copyWith(
+          status: UserStatus.failure,
+          errorMessage: 'User not authenticated',
+        ),
+      );
       return;
     }
 
-    final currentUser = (state as UserAuthenticated).user;
+    final currentUser = state.user!;
 
-    emit(const UserLoading(message: 'Uploading photo...'));
+    emit(
+      state.copyWith(
+        status: UserStatus.loading,
+        loadingMessage: 'Uploading photo...',
+      ),
+    );
 
     final uploadResult = await uploadUserAvatarUseCase(
       userId: currentUser.id,
@@ -181,7 +255,12 @@ class UserBloc extends Bloc<UserEvent, UserState> {
     );
 
     await uploadResult.fold(
-      (failure) async => emit(UserError(failure.message)),
+      (failure) async => emit(
+        state.copyWith(
+          status: UserStatus.failure,
+          errorMessage: failure.message,
+        ),
+      ),
       (url) async {
         final updatedUser = currentUser.copyWith(
           photoUrl: url,
@@ -191,8 +270,12 @@ class UserBloc extends Bloc<UserEvent, UserState> {
         final result = await updateUserUseCase(updatedUser);
 
         result.fold(
-          (f) => emit(UserError(f.message)),
-          (user) => emit(UserAuthenticated(user)),
+          (f) => emit(
+            state.copyWith(status: UserStatus.failure, errorMessage: f.message),
+          ),
+          (user) => emit(
+            state.copyWith(status: UserStatus.authenticated, user: user),
+          ),
         );
       },
     );

@@ -19,6 +19,8 @@ class KnowledgeTypeAdapter extends TypeAdapter<KnowledgeType> {
         return KnowledgeType.summary;
       case 2:
         return KnowledgeType.idea;
+      case 3:
+        return KnowledgeType.session;
       default:
         return KnowledgeType.note;
     }
@@ -35,6 +37,9 @@ class KnowledgeTypeAdapter extends TypeAdapter<KnowledgeType> {
         break;
       case KnowledgeType.idea:
         writer.writeByte(2);
+        break;
+      case KnowledgeType.session:
+        writer.writeByte(3);
         break;
     }
   }

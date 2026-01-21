@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:smart_study_plan/config/routes/app_routes.dart';
@@ -51,7 +52,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
               child: Form(
                 key: _formKey,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const AuthHeader(
                       title: 'Reset password',
@@ -67,7 +68,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                           v != null && v.contains('@') ? null : 'Invalid email',
                     ),
 
-                    const SizedBox(height: 24),
+                    SizedBox(height: 32.h),
 
                     AuthSubmitButton(
                       loading: state is ResetPasswordLoading,
@@ -81,12 +82,19 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                       },
                     ),
 
-                    const SizedBox(height: 20),
+                    SizedBox(height: 24.h),
 
                     Center(
-                      child: TextButton(
+                      child: TextButton.icon(
                         onPressed: () => context.goNamed(AppRouteNames.login),
-                        child: const Text('Back to login'),
+                        icon: Icon(Icons.arrow_back, size: 18.sp),
+                        label: Text(
+                          'Back to login',
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
                   ],

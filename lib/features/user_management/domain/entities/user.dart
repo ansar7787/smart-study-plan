@@ -21,6 +21,8 @@ class User extends Equatable {
   final String? photoUrl;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final int aiUsageCount;
+  final DateTime? lastAiUsageDate;
 
   const User({
     required this.id,
@@ -30,12 +32,20 @@ class User extends Equatable {
     this.photoUrl,
     required this.createdAt,
     required this.updatedAt,
+    this.aiUsageCount = 0,
+    this.lastAiUsageDate,
   });
 
   bool get isAdmin => role == UserRole.admin;
 
   /// ✅ REQUIRED FOR UPDATE FLOW
-  User copyWith({String? name, String? photoUrl, DateTime? updatedAt}) {
+  User copyWith({
+    String? name,
+    String? photoUrl,
+    DateTime? updatedAt,
+    int? aiUsageCount,
+    DateTime? lastAiUsageDate,
+  }) {
     return User(
       id: id,
       email: email,
@@ -44,6 +54,8 @@ class User extends Equatable {
       photoUrl: photoUrl ?? this.photoUrl,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      aiUsageCount: aiUsageCount ?? this.aiUsageCount,
+      lastAiUsageDate: lastAiUsageDate ?? this.lastAiUsageDate,
     );
   }
 
@@ -56,5 +68,7 @@ class User extends Equatable {
     photoUrl,
     createdAt,
     updatedAt,
+    aiUsageCount,
+    lastAiUsageDate,
   ];
 }

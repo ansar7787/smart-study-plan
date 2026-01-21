@@ -13,25 +13,36 @@ class LoginUserUseCase extends UseCase<User, LoginUserParams> {
 
   @override
   Future<Either<Failure, User>> call(LoginUserParams params) async {
-    // Validation
-    if (params.email.isEmpty || params.password.isEmpty) {
+    // Validation: Require email/pass OR googleIdToken
+    if (params.googleIdToken == null &&
+        (params.email.isEmpty || params.password.isEmpty)) {
       return const Left(ValidationFailure('Email and password required'));
     }
 
-    if (!RegExp(AppConstants.emailPattern).hasMatch(params.email)) {
+    if (params.email.isNotEmpty &&
+        !RegExp(AppConstants.emailPattern).hasMatch(params.email)) {
       return const Left(ValidationFailure('Invalid email format'));
     }
 
-    return repository.loginUser(email: params.email, password: params.password);
+    return repository.loginUser(
+      email: params.email,
+      password: params.password,
+      googleIdToken: params.googleIdToken,
+    );
   }
 }
 
 class LoginUserParams extends Equatable {
   final String email;
   final String password;
+  final String? googleIdToken;
 
-  const LoginUserParams({required this.email, required this.password});
+  const LoginUserParams({
+    required this.email,
+    required this.password,
+    this.googleIdToken,
+  });
 
   @override
-  List<Object?> get props => [email, password];
+  List<Object?> get props => [email, password, googleIdToken];
 }

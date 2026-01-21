@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -11,16 +12,16 @@ class HomeHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<UserBloc, UserState>(
       buildWhen: (prev, curr) =>
-          curr is UserAuthenticated &&
-          (prev is! UserAuthenticated ||
-              prev.user.name != curr.user.name ||
-              prev.user.photoUrl != curr.user.photoUrl),
+          curr.status == UserStatus.authenticated &&
+          (prev.status != UserStatus.authenticated ||
+              prev.user?.name != curr.user?.name ||
+              prev.user?.photoUrl != curr.user?.photoUrl),
       builder: (context, state) {
-        if (state is! UserAuthenticated) {
+        if (state.status != UserStatus.authenticated || state.user == null) {
           return const SizedBox.shrink();
         }
 
-        final user = state.user;
+        final user = state.user!;
         final theme = Theme.of(context);
         final colors = theme.colorScheme;
 
@@ -36,7 +37,7 @@ class HomeHeader extends StatelessWidget {
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
           child: InkWell(
-            onTap: () => context.goNamed(AppRouteNames.profile),
+            onTap: () => context.pushNamed(AppRouteNames.profile),
             borderRadius: BorderRadius.circular(22),
             child: Ink(
               padding: const EdgeInsets.all(14),
@@ -63,7 +64,7 @@ class HomeHeader extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                       image: user.photoUrl != null
                           ? DecorationImage(
-                              image: NetworkImage(user.photoUrl!),
+                              image: CachedNetworkImageProvider(user.photoUrl!),
                               fit: BoxFit.cover,
                             )
                           : null,

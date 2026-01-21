@@ -12,11 +12,12 @@ class GetTasksBySubjectUsecase extends UseCase<List<Task>, GetTasksParams> {
 
   @override
   Future<Either<Failure, List<Task>>> call(GetTasksParams params) async {
-    return repository.getTasksBySubject(params.subjectId);
+    return repository.getTasksBySubject(params.subjectId, params.userId);
   }
 }
 
 class GetTasksParams {
   final String subjectId;
-  const GetTasksParams({required this.subjectId});
+  final String userId;
+  const GetTasksParams({required this.subjectId, required this.userId});
 }

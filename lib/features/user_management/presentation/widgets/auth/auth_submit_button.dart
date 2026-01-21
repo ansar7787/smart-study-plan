@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class AuthSubmitButton extends StatelessWidget {
   final bool loading;
@@ -16,17 +17,26 @@ class AuthSubmitButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 52,
+      height: 52.h,
       child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          elevation: 2,
+          shadowColor: Theme.of(
+            context,
+          ).colorScheme.primary.withValues(alpha: 0.4),
+        ),
         onPressed: loading ? null : onPressed,
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 200),
           child: loading
-              ? const SizedBox(
-                  key: ValueKey('loading'),
-                  height: 22,
-                  width: 22,
-                  child: CircularProgressIndicator(
+              ? SizedBox(
+                  key: const ValueKey('loading'),
+                  height: 22.h,
+                  width: 22.h,
+                  child: const CircularProgressIndicator(
                     strokeWidth: 2.5,
                     color: Colors.white,
                   ),
@@ -34,9 +44,10 @@ class AuthSubmitButton extends StatelessWidget {
               : Text(
                   text,
                   key: const ValueKey('text'),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
                   ),
                 ),
         ),

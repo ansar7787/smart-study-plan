@@ -12,4 +12,7 @@ enum KnowledgeType {
 
   @HiveField(2)
   idea,
+
+  @HiveField(3)
+  session,
 }

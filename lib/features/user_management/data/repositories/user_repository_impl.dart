@@ -7,6 +7,7 @@ import '../datasources/user_local_datasource.dart';
 import '../datasources/user_remote_datasource.dart';
 import '../models/user_model.dart';
 import '../../../../core/error/failures.dart';
+import '../../../../core/error/firebase_error_handler.dart';
 
 class UserRepositoryImpl implements UserRepository {
   final UserLocalDatasource local;
@@ -29,7 +30,7 @@ class UserRepositoryImpl implements UserRepository {
       await local.saveUser(model);
       return Right(model.toEntity());
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(UnknownFailure(FirebaseErrorHandler.getMessage(e)));
     }
   }
 
@@ -37,13 +38,18 @@ class UserRepositoryImpl implements UserRepository {
   Future<Either<Failure, User>> loginUser({
     required String email,
     required String password,
+    String? googleIdToken,
   }) async {
     try {
-      final model = await remote.loginUser(email: email, password: password);
+      final model = await remote.loginUser(
+        email: email,
+        password: password,
+        googleIdToken: googleIdToken,
+      );
       await local.saveUser(model);
       return Right(model.toEntity());
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(UnknownFailure(FirebaseErrorHandler.getMessage(e)));
     }
   }
 
@@ -60,7 +66,7 @@ class UserRepositoryImpl implements UserRepository {
       await remote.resetPassword(email);
       return const Right(null);
     } catch (e) {
-      return Left(UnknownFailure(e.toString()));
+      return Left(UnknownFailure(FirebaseErrorHandler.getMessage(e)));
     }
   }
 
