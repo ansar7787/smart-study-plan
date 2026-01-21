@@ -1,136 +1,90 @@
-# Create .gitignore
-cat > .gitignore << 'EOF'
-############################
-# Global / OS
-############################
-.DS_Store
-Thumbs.db
-*.swp
-*.swo
-*.log
-*.tmp
-*.bak
-*.orig
+# Miscellaneous
 *.class
+*.log
 *.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+migrate_working_dir/
 
-############################
-# IDEs / Editors
-############################
-.idea/
+# IntelliJ related
 *.iml
 *.ipr
 *.iws
+.idea/
 
-.vscode/
-!.vscode/extensions.json
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
 
-.atom/
-.history/
-
-############################
-# Git / SVN leftovers
-############################
-.svn/
-.migrate_working_dir/
-
-############################
-# Dart / Flutter (GENERATED)
-############################
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages
-.pub/
 .pub-cache/
-build/
-coverage/
+.pub/
+/build/
 
-**/doc/api/
-**/.dart_tool/
-**/.packages
+# Web related
+lib/generated_plugin_registrant.dart
 
-############################
-# Flutter build artifacts
-############################
-**/ios/Flutter/.last_build_id
-**/ios/Flutter/ephemeral/
-**/ios/Flutter/flutter_assets/
-**/ios/Flutter/Flutter.framework
-**/ios/Flutter/Flutter.podspec
-**/ios/Flutter/Generated.xcconfig
-**/ios/Flutter/flutter_export_environment.sh
-**/ios/Flutter/local.properties
-**/ios/Flutter/plugins.json
+# Symbolication related
+app.*.symbols
 
-############################
-# iOS / macOS (Xcode)
-############################
-**/ios/**/*.xcworkspace
-**/ios/**/*.xcuserstate
-**/ios/**/*.pbxuser
-**/ios/**/*.perspectivev3
-**/ios/**/*.mode1v3
-**/ios/**/*.mode2v3
-**/ios/**/*.moved-aside
-**/ios/**/*.xcarchive
-**/ios/**/*.orig.*
+# Obfuscation related
+app.*.map.json
 
-**/ios/**/.symlinks/
-**/ios/**/.vagrant/
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
 
-############################
-# iOS Secrets / Signing
-############################
-**/ios/**/*.jks
-**/ios/**/*.keystore
-**/ios/**/*.pem
-**/ios/**/*.p12
-**/ios/**/*.mobileprovision
-**/ios/**/*.profile
-**/ios/**/*.properties
-
-############################
-# Android / Gradle (GENERATED)
-############################
+# Android
 **/android/.gradle/
 **/android/captures/
+**/android/gradlew
+**/android/gradlew.bat
 **/android/local.properties
 **/android/key.properties
 **/android/**/GeneratedPluginRegistrant.java
 
-**/android/**/build/
-**/android/**/gradle-wrapper.jar
-**/android/gradlew
-**/android/gradlew.bat
+# iOS
+**/ios/**/*.mode1v3
+**/ios/**/*.mode2v3
+**/ios/**/*.moved-aside
+**/ios/**/*.pbxuser
+**/ios/**/*.perspectivev3
+**/ios/**/*.xcworkspace
+**/ios/**/*.xcuserstate
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Podfile.lock
+**/ios/Pods/
+**/ios/Runner.xcworkspace/
+**/ios/Runner.xcodeproj/project.xcworkspace/
+**/ios/Runner.xcodeproj/xcuserdata/
 
-############################
-# Firebase / Secrets
-############################
+# macOS
+**/macos/Flutter/ephemeral/
+
+# Windows
+**/windows/flutter/ephemeral/
+
+# Linux
+**/linux/flutter/ephemeral/
+
+# App Secrets & Configuration
 google-services.json
 GoogleService-Info.plist
-firebase-debug.log
-firebase.json
+firebase_options.dart
+lib/firebase_options.dart
 
-
-############################
-# Obfuscation / Symbol files
-############################
-app.*.symbols
-app.*.map.json
-
-############################
-# Logs
-############################
-*.log
-
-############################
-# Exceptions (KEEP THESE)
-############################
-!/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
-EOF
-
-
-
-.vscode/launch.json
+# Custom Secrets (CRITICAL)
 lib/config/ai/api_keys.dart

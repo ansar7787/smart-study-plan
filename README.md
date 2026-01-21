@@ -7,6 +7,24 @@
 
 **Smart Study Plan** is a next-generation education productivity application built with Flutter. It combines traditional study planning with modern AI capabilities to help students maximize their learning potential. Designed with Clean Architecture and powered by Firebase, it offers a robust, scalable, and beautiful experience.
 
+## 📋 Table of Contents
+- [✨ Key Features](#-key-features)
+- [📱 Screenshots](#-screenshots)
+- [🏗️ Architecture](#-technical-architecture)
+- [📂 Folder Structure](#-folder-structure)
+- [🚀 Getting Started](#-getting-started)
+- [🤝 Contributing](#-contributing)
+- [🛡️ Security](#-security)
+
+---
+
+## 🛡️ Security
+
+This project takes security seriously.
+- **API Keys**: All sensitive API keys (e.g., Gemini AI) are stored in secure, git-ignored configuration files.
+- **Authentication**: Powered by Firebase Auth for industry-standard security.
+- **Data Privacy**: All user data is stored securely in Firestore with user-scoped access rules.
+
 ---
 
 ## 📱 Screenshots Gallery
